@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Document</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="description" content="Description">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+</head>
+<body>
+  <div data-app id="main">Please wait...</div>
+  <script>
+    window.$docsify = {
+      el: '#main',
+      // 项目名称
+      name: 'Lucas笔记',
+      // 仓库地址，点击右上角的Github章鱼猫头像会跳转到此地址
+      repo: '',
+      // 设置路由别名。您可以自由管理路由规则。支持 RegExp。请注意，顺序很重要！如果路由可以由多个别名匹配，则您首先声明的别名优先。
+//      alias: {
+//      '/.*/_sidebar.md': '/_sidebar.md'
+//      },
+      // 导航栏支持，默认加载的是项目根目录下的_navbar.md文件
+      loadNavbar: true,
+      loadSidebar: true,
+      // 封面支持，默认加载的是项目根目录下的_coverpage.md文件
+      coverpage: {
+        '/': '_coverpage.md',
+        '/odoo/': '_coverpage.md'
+      },
+      // 最大支持渲染的标题层级
+      maxLevel: 5,
+      // 自定义侧边栏后默认不会再生成目录，设置生成目录的最大层级（建议配置为2-4）
+      subMaxLevel: 3,
+      formatUpdated: '{YYYY}/{MM}/{DD} {HH}:{mm}',
+//      search: 'auto', // default
+      search: {
+        maxAge: 86400000, // Expiration time, the default one day
+        paths: 'auto', // or 'auto'
+        placeholder: 'Type to search',
+
+        // Localization
+        placeholder: {
+          '/zh-cn/': '搜索',
+          '/': 'Type to search',
+        },
+
+        noData: 'No Results!',
+
+        // Localization
+        noData: {
+          '/zh-cn/': '找不到结果',
+          '/': 'No Results',
+        },
+
+        // Headline depth, 1 - 6
+        depth: 4,
+
+        hideOtherSidebarContent: false, // whether or not to hide other sidebar content
+
+        // To avoid search index collision
+        // between multiple websites under the same domain
+//        namespace: 'website-1',
+      },
+      onlyCover: false,
+      auto2top: true,
+      // 小屏设备下合并导航栏到侧边栏
+      mergeNavbar: true,
+      pagination: {
+        previousText: '上一章节',
+        nextText: '下一章节',
+       },
+    }
+  </script>
+  <!-- Docsify v4 -->
+  <script src="//cdn.jsdelivr.net/npm/docsify@4"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/plugins/emoji.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/search.min.js"></script>
+<!--  <script src="//cdn.jsdelivr.net/npm/docsify-copy-code/dist/docsify-copy-code.min.js"></script>-->
+  <script src="//cdn.jsdelivr.net/npm/docsify-pagination/dist/docsify-pagination.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js"></script>
+</body>
+</html>
