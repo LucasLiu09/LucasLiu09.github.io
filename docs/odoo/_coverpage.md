@@ -1,5 +1,5 @@
 [//]: # (![logo]&#40;_media/icon.svg&#41;)
-
+![logo](../_images/lucas2.png)
 # Odoo Dev Notes<small></small>
 
 > 记录Odoo ERP系统的开发实践与深度优化，分享从模块定制、性能调优到系统集成的全流程解决方案。

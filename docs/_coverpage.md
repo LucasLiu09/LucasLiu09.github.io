@@ -1,5 +1,5 @@
 [//]: # (![logo]&#40;_media/icon.svg&#41;)
-
+![logo](_images/lucas2.png)
 # 分享思考 · 记录成长 · 探索世界<small></small>
 
 > 记录技术探索、生活感悟与经验分享的地方
