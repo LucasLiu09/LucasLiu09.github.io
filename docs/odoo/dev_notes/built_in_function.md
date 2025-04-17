@@ -128,7 +128,7 @@ def get_view(self, view_id=None, view_type="form", **options):
             if self.env.context.get('context1'):
                 # 此处添加attrib时注意不能用Boolean类型
                 new_node = etree.Element('field', {'name': 'so_dt_ids', 'readonly': 'true',
-                                      'context': "{'tree_view_ref': 'hh_sale.cb_so_dt_unit_price_approval_view_tree'}"})
+                                      'context': "{'tree_view_ref': 'xxx_view_tree'}"})
                 div[0].append(new_node)
                 # 此处postprocess_and_fields只能对新增的节点处理，否则会影响原xml其他节点设置的属性。
                 new_arch, new_models = View.postprocess_and_fields(new_node, self._name)
