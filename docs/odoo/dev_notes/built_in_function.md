@@ -202,3 +202,217 @@ class Base(models.AbstractModel):
         return res
 
 ```
+
+# user_has_groups
+
+> 判断当前登录用户res_users是否存在某群组res_group中。
+
+```python
+@api.model
+def user_has_groups(self, groups):	
+	# groups 为','分隔的群组名，包括所在模块， module_name.group_name
+	# 判断当前用户是否存在这些群组中，是则返回True，否则返回False
+	# 如果在groups中以"!,"开头，则取否。即如果用户存在这些群组中，返回False，否则返回True
+	# 也可以解释为，如果当前用户不存在这些群组中，则返回True，反之则返回False
+	....
+
+self.user_has_groups(group_name)
+self.user_has_groups(!group_name)
+```
+
+# name_search
+
+> Odoo模型的一个公共方法，用于根据名称模式搜索记录。它通常用于前端UI中的自动完成字段(Many2one字段的下拉搜索)。
+
+通常建议重写`_name_search()`而不是`name_search()`，因为前者提供了更多的灵活性。
+
+# _name_search
+
+> `_name_search()`是`name_search()`的底层实现方法，包含了实际的搜索逻辑。
+
+适用_name_search()的场景
+
+- 需要自定义搜索逻辑时
+- 需要添加额外的搜索条件时
+- 需要优化搜索性能时
+- 需要基于域(domain)进行复杂过滤时
+
+基本_name_search()示例
+
+```python
+from odoo.osv import expression
+
+...
+
+@api.model
+def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get_uid=None):
+    args = list(args or [])
+    if self._context.get('xxxx'):	# 通过context控制影响范围
+        domain = []
+        if name:
+            # 添加额外的搜索条件my_field
+	        domain = expression.OR([args, [('my_field', operator, name)]])
+        # 添加额外的过滤条件
+        domain = expression.AND([('state', '!=', 'cancelled')])
+        return super()._name_search(name=name, args=domain, operator=operator, limit=limit, name_get_uid=name_get_uid)
+    return super()._name_search(name=name, args=args, operator=operator, limit=limit, name_get_uid=name_get_uid)
+```
+
+# fields_get
+
+> Odoo模型的一个重要方法，用于动态获取模型的字段定义信息。它返回一个字典，包含模型中所有字段的元数据，通常用于前端界面动态生成表单视图或进行字段级别的权限控制。
+
+`def fields_get(self, allfields=None, attributes=None)`
+
+参数说明：
+
+- `allfields`: 可选参数，指定要获取的字段列表(默认返回所有字段)
+- attributes: 可选参数，指定要获取的字段属性列表(默认返回所有属性)
+
+## 重写的场景<!-- {docsify-ignore} -->
+
+1. 动态修改字段属性
+
+   **场景**：根据用户权限或某些条件动态修改字段属性(如只读、必填等)
+
+   ```python
+   from odoo import models, api
+   
+   class SaleOrder(models.Model):
+       _inherit = 'sale.order'
+       
+       @api.model
+       def fields_get(self, allfields=None, attributes=None):
+           res = super(SaleOrder, self).fields_get(allfields, attributes)
+           
+           # 如果用户不是经理，使某些字段只读
+           if not self.env.user.has_group('sales_team.group_sale_manager'):
+               for field_name in ['discount', 'payment_term_id']:
+                   if field_name in res:
+                       res[field_name]['readonly'] = True
+                       
+           return res
+   ```
+
+2. 隐藏敏感字段
+
+   **场景**：根据用户角色隐藏敏感或内部字段
+
+   ```python
+   class HrEmployee(models.Model):
+       _inherit = 'hr.employee'
+       
+       @api.model
+       def fields_get(self, allfields=None, attributes=None):
+           res = super(HrEmployee, self).fields_get(allfields, attributes)
+           
+           # 非HR用户看不到薪资相关字段
+           if not self.env.user.has_group('hr.group_hr_user'):
+               for field in ['salary', 'bank_account_id', 'ssnid']:
+                   if field in res:
+                       del res[field]
+                       
+           return res
+   ```
+
+3. 动态字段依赖
+
+   **场景**：根据其他系统配置动态改变字段属性
+
+   ```python
+   class ProductProduct(models.Model):
+       _inherit = 'product.product'
+       
+       @api.model
+       def fields_get(self, allfields=None, attributes=None):
+           res = super(ProductProduct, self).fields_get(allfields, attributes)
+           
+           # 如果公司启用了多仓库，显示仓库相关字段
+           multi_warehouse = self.env['ir.config_parameter'].get_param('stock.multi_warehouse')
+           if multi_warehouse == 'False':
+               for field in ['warehouse_id', 'stock_location_id']:
+                   if field in res:
+                       res[field]['invisible'] = True
+                       
+           return res
+   ```
+
+4. 自定义字段描述
+
+   场景：根据上下文或用户语言动态修改字段描述
+
+   ```python
+   class ProjectTask(models.Model):
+       _inherit = 'project.task'
+       
+       @api.model
+       def fields_get(self, allfields=None, attributes=None):
+           res = super(ProjectTask, self).fields_get(allfields, attributes)
+           
+           # 根据用户语言提供不同的帮助文本
+           lang = self.env.context.get('lang', 'en_US')
+           if lang == 'fr_FR':
+               if 'deadline' in res:
+                   res['deadline']['help'] = "Date limite pour terminer cette tâche"
+           
+           return res
+   
+       
+   class Product(models.Model):
+       _inherit = "product.product"
+       
+   	@api.model
+       def fields_get(self, allfields=None, attributes=None):
+           res = super().fields_get(allfields, attributes)
+           if self._context.get('location') and isinstance(self._context['location'], int):
+               location = self.env['stock.location'].browse(self._context['location'])
+               if location.usage == 'supplier':
+                   if res.get('virtual_available'):
+                       res['virtual_available']['string'] = _('Future Receipts')
+                   if res.get('qty_available'):
+                       res['qty_available']['string'] = _('Received Qty')
+               elif location.usage == 'internal':
+                   if res.get('virtual_available'):
+                       res['virtual_available']['string'] = _('Forecasted Quantity')
+               elif location.usage == 'customer':
+                   if res.get('virtual_available'):
+                       res['virtual_available']['string'] = _('Future Deliveries')
+                   if res.get('qty_available'):
+                       res['qty_available']['string'] = _('Delivered Qty')
+               elif location.usage == 'inventory':
+                   if res.get('virtual_available'):
+                       res['virtual_available']['string'] = _('Future P&L')
+                   if res.get('qty_available'):
+                       res['qty_available']['string'] = _('P&L Qty')
+               elif location.usage == 'production':
+                   if res.get('virtual_available'):
+                       res['virtual_available']['string'] = _('Future Productions')
+                   if res.get('qty_available'):
+                       res['qty_available']['string'] = _('Produced Qty')
+           return res
+   ```
+
+5. 限制字段导出
+
+   **场景**：不允许导出敏感或内部信息。（也可以在字段定义时设置属性`exportable=False`）
+
+   ```python
+   def _get_export_disable_fields(self):
+       '''不允许导出的字段'''
+       disable_fields_1 = ['field1', 'field2', 'field3']
+       return disable_fields_1
+   
+   @api.model
+   def fields_get(self, fields=None, attributes=None):
+       """
+           fields[name].update(exportable=False, ) 将不允许导出的字段的exportable修改为False
+       """
+       fields = super(hr_employee, self).fields_get(fields, attributes=attributes)
+       for name in self._get_export_disable_fields():
+           if name not in fields:
+               continue
+           fields[name].update(exportable=False, )
+       return fields
+   ```
+
+   
