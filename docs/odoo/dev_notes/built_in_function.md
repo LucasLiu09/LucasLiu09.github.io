@@ -438,12 +438,8 @@ class modelA(models.Model):
 
 # fields_view_get
 
-> [!CAUTION]
->
-> 在odoo16版本已经开始弃用fields_view_get，用get_view代替。
+!> 在odoo16版本已经开始弃用fields_view_get，用get_view代替。
 
-> [!NOTE]
->
 > **Model.fields_view_get([view_id | view_type='form'])**
 >
 > Get the detailed composition of the requested view like fields, model, view architecture
