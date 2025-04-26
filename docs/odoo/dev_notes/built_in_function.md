@@ -416,3 +416,198 @@ def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get
    ```
 
    
+
+# _check_recursion
+
+> 检查字段循环关联，例如防止parent_id循环关联造成闭环。
+
+```python
+from odoo.exceptions import ValidationError
+
+class modelA(models.Model):
+    
+    parent_id = fields.Many2one()
+    
+    # 函数名称可以自定义(_check_hierarchy)
+    @api.constrains('parent_id')
+    def _check_hierarchy(self):
+         if not self._check_recursion():
+             raise models.ValidationError('Error! You cannot create recursive categories.')
+
+```
+
+# fields_view_get
+
+> [!CAUTION]
+>
+> 在odoo16版本已经开始弃用fields_view_get，用get_view代替。
+
+> [!NOTE]
+>
+> **Model.fields_view_get([view_id | view_type='form'])**
+>
+> Get the detailed composition of the requested view like fields, model, view architecture
+>
+> **Parameters**
+>
+> - **view_id** (int) – id of the view or None
+> - **view_type** (str) – type of the view to return if view_id is None (‘form’, ‘tree’, …)
+> - **toolbar** (bool) – true to include contextual actions
+> - **submenu** – deprecated
+>
+> **Returns**
+>
+> composition of the requested view (including inherited views and extensions)
+>
+> **Return type：**dict
+>
+> **Raises:**	
+>
+> AttributeError –
+>
+> if the inherited view has unknown position to work with other than ‘before’, ‘after’, ‘inside’, ‘replace’
+>
+> if some tag other than ‘position’ is found in parent view
+>
+> Invalid ArchitectureError – 
+>
+> if there is view type other than form, tree, calendar, search etc defined on the structure
+
+## 用法<!-- {docsify-ignore} -->
+
+odoo的视图结构是以XML的格式存放于ir.ui.view表中，属于静态格式。
+
+- 在视图加载时修改arch属性，动态修改视图的结构。
+  1. 修改field的属性
+  2. 根据条件限制view的操作权限(create/edit/delete)
+  3. 增加field字段
+  4. 增加页面内容(符合xml格式)
+  5. 动态修改field的domain
+
+修改属性
+
+```python
+from lxml import etree
+
+@api.model
+def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
+    ret_val = super(xxx, self).fields_view_get(view_id=view_id, view_type=view_type,
+                                                               toolbar=toolbar, submenu=submenu)
+    if self._context and self._context.get('handle_type') == 'readonly':
+        doc = etree.XML(ret_val['arch'])
+        for field in ret_val['fields']:
+            for node in doc.xpath("//field[@name='%s']" % field):
+            	# 设置只读
+                node.set("readonly", "1")
+                modifiers = json.loads(node.get("modifiers"))
+                modifiers['readonly'] = True
+                node.set("modifiers", json.dumps(modifiers))
+        for node in doc.xpath("//button"):
+        	# 设置不可见, 不修改modifiers不生效。
+            node.set("invisible", "1")
+            if node.get("modifiers"):
+                modifiers = json.loads(node.get("modifiers"))
+                modifiers['invisible'] = True
+                node.set("modifiers", json.dumps(modifiers))
+            else:
+                modifiers = {'invisible': True}
+                node.set("modifiers", json.dumps(modifiers))
+        ret_val['arch'] = etree.tostring(doc, encoding='unicode')
+        return ret_val
+    else:
+        return ret_val
+```
+
+修改视图操作权限
+
+```python
+def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):  
+	res = super(xxx, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,submenu=False)  
+	if res['type']=="form":  
+		id = res['id']  
+		//根据id去取得资料，并进行判断  
+		if 条件成立:  
+			doc = etree.XML(res['arch'])  
+			doc.xpath("//form")[0].set("edit","false")  
+			res['arch']=etree.tostring(doc)  
+	return res 
+```
+
+动态增加field
+
+```python
+@api.model
+def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
+	res = super(xxx, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,submenu=False)  
+    doc = etree.XML(res['arch'])
+    summary = doc.xpath("//field[@name='product_id']")
+    if len(summary):
+        summary = summary[0]
+        summary.addnext(etree.Element('field', {'name': 'product_id', 
+                                                'string':'title of new field',
+                                                'nolabel':'0',
+                                                }))
+		# 添加子标签
+		# etree.SubElement() 
+    res['arch'] = etree.tostring(doc) 
+    return res
+```
+
+增加page
+
+```python
+class product_product(osv.osv):
+  _inherit = 'product.product'
+   
+  def fields_view_get(self, view_id=None, view_type='form', toolbar=False,submenu=False):
+    """
+    Changes the view dynamically
+    @param self: The object pointer.
+    @return: New arch of view.
+    """
+    ret_val = super(product_product, self).fields_view_get(view_id, view_type, toolbar,submenu)
+    if view_type == 'form':
+      doc = etree.XML(ret_val['arch'], parser=None, base_url=None)
+       
+      #要加入到视图里的page
+      _moves_arch_lst = """
+        <page string='Feature'>
+        </page>
+      """
+      first_node = doc.xpath("//page[@string='Sales']")
+      if first_node and len(first_node)>0:  
+        #先把_moves_arch_lst转成XML Node，然后加到查找到node中
+        feature_page = etree.XML(_moves_arch_lst)
+        first_node.addnext(feature_page)            
+        ret_val['arch'] = etree.tostring(doc, encoding="utf-8")
+    return ret_val
+```
+
+动态修改domain
+
+```python
+"""
+	Add domain 'allow_check_writting = True' on journal_id field 
+	and remove 'widget = selection' on the same field 
+	because the dynamic domain is not allowed on such widget
+"""
+if not context: 
+    context = {}
+res = super(account_voucher, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar, submenu=submenu)
+doc = etree.XML(res['arch'])
+nodes = doc.xpath("//field[@name='journal_id']")
+ 
+# 检查context是否有指定的标志（write_check）
+if context.get('write_check', False) :
+	for node in nodes:
+	 
+		# 动态修改 journal_id 这个field的domain
+		node.set('domain', "[('type', '=', 'bank'), ('allow_check_writing','=',True),('your_field','=','value')]")
+		 
+		# 把 widget 清空，原因在上面已经说了
+		node.set('widget', '')
+		 
+	res['arch'] = etree.tostring(doc)
+return res
+```
+
