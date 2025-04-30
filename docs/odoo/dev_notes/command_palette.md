@@ -1,4 +1,4 @@
-# CommandPalette
+# CommandPalette<!-- {docsify-ignore} -->
 
 通过ctrl + K 调出的控制台。
 
@@ -8,7 +8,7 @@ Base组件：`CommandPalette`
 
 在输入/时，可查询菜单。这一处理是通过registry.category("command_categories").add("menu_items", ...)注册的。源码路径：@web/webclient/menus/menu_providers.js
 
-# menu_providers
+# menu_providers<!-- {docsify-ignore} -->
 
 ```javascript
 /** @odoo-module **/
@@ -88,7 +88,7 @@ commandProviderRegistry.add("menu", {
 
 ```
 
-## 源码解析
+# 源码解析<!-- {docsify-ignore} -->
 
 * 获取所有apps/menus
 
