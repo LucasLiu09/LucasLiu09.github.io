@@ -11,7 +11,7 @@
 7. 根据输入的搜索内容过滤菜单项
 8. 支持不同命名空间来搜索不同类型的项目("@"、"/")
 
-## 代码
+## 代码<!-- {docsify-ignore} -->
 
 - Component
 
@@ -260,7 +260,7 @@ registry.category("systray").add("quick_menu", systrayItem, {sequence: 99});
 </templates>
 ```
 
-## 截图
+## 截图<!-- {docsify-ignore} -->
 
 ![apps](_images\quick_menu_1.png "apps")
 
