@@ -6,3 +6,6 @@
 
 - 开发笔记
   - [内置函数](/odoo/dev_notes/built_in_function.md)
+  - [CommandPalette解析](/odoo/dev_notes/command_palette.md)
+  - [系统托盘-最小示例](/odoo/dev_notes/simplest_systray.md)
+  - [系统托盘-快速搜索菜单](/odoo/dev_notes/systray_quick_menu.md)
