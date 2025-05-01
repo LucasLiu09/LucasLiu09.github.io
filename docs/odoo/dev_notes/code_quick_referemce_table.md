@@ -1,15 +1,15 @@
-# 代码速查表
+# 代码速查表<!-- {docsify-ignore-all} -->
 
-## 后端<!-- {docsify-ignore} -->
+## 后端
 
-### Domain<!-- {docsify-ignore} -->
+### Domain
 
 `from odoo.osv import expression`
 
 - expression.AND(domains)
 - expression.OR(domains)
 
-### One2many/Many2many Command<!-- {docsify-ignore} -->
+### One2many/Many2many Command
 
 对于x2m的关联关系，通过更直观的命名函数执行更具有可读性，以此替代三元组首位为整数的方式。
 
@@ -55,5 +55,5 @@ return {
 
 
 
-## 前端<!-- {docsify-ignore} -->
+## 前端
 
