@@ -9,3 +9,5 @@
   - [CommandPalette解析](/odoo/dev_notes/command_palette.md)
   - [系统托盘-最小示例](/odoo/dev_notes/simplest_systray.md)
   - [系统托盘-快速搜索菜单](/odoo/dev_notes/systray_quick_menu.md)
+  - [代码速查表](/odoo/dev_notes/code_quick_referemce_table.md)
+
