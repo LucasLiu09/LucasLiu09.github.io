@@ -23,4 +23,4 @@
 
 
 ## 代码<!-- {docsify-ignore} -->
-> [github](https://github.com/LucasLiu09/odoo-module-lucas/tree/16.0)
+> [github](https://github.com/LucasLiu09/odoo-module-lucas/tree/16.0/quick_menu_systray)
