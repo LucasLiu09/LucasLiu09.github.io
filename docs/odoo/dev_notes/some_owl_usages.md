@@ -8,7 +8,7 @@
 
 通过`t-slot`指令定义.
 
-```javascript
+```xml
 <div class="info-box">
   <div class="info-box-title">
     <t t-slot="title"/>
@@ -22,7 +22,7 @@
 
 在父组件通过`t-set-slot`指令来设置内容
 
-```javascript
+```xml
 <InfoBox>
   <t t-set-slot="title">
     Specific Title. It could be html also.
@@ -39,7 +39,7 @@
 
 例如：
 
-```javascript
+```xml
 <div t-name="Parent">
   <Child>
     <span>some content</span>
@@ -57,7 +57,7 @@ Default content
 
 如果slot内定义了默认内容，当父组件未定义slot时，将渲染默认内容.例如：
 
-```javascript
+```xml
 <div t-name="Parent">
   <Child/>
 </div>
@@ -78,7 +78,7 @@ Default content
 
 组件可以像这样将其插槽传递给子组件：
 
-```javascript
+```xml
 <Child slots="props.slots"/>
 ```
 
@@ -116,7 +116,7 @@ class Notebook extends Component {
 
 以下是如何使用这个 `Notebook` 组件(注意如何读取每个slot的 `title` 值)：
 
-```javascript
+```xml
 <Notebook>
   <t t-set-slot="page1" title.translate="Page 1">
     <div>this is in the page 1</div>
@@ -134,7 +134,7 @@ Slot params 的工作方式与普通 props 类似，因此可以使用 `.transla
 通常slot都有父组件传递内容给通用组件，反之在父组件定义slot时可以访问子组件提供的内容。此时就需要用到`t-slot-scope`来定义一个变量的名称，该变量可以访问子组件提供的所有内容。
 需要将`t-slot-scope`与`t-set-slot`结合使用：
 
-```javascript
+```xml
 <MyComponent>
     <t t-set-slot="foo" t-slot-scope="scope">
         content
@@ -146,7 +146,7 @@ Slot params 的工作方式与普通 props 类似，因此可以使用 `.transla
 
 包含该slot的子组件可以提供如下值(直接指定或通过t-props):
 
-```javascript
+```xml
 <t t-slot="foo" bool="other_var" num="5">
 
 <t t-slot="foo" t-props="someObject">
@@ -154,7 +154,7 @@ Slot params 的工作方式与普通 props 类似，因此可以使用 `.transla
 
 对于default slot，可以直接在组件本身上声明slot scope：
 
-```javascript
+```xml
 <MyComponent t-slot-scope="scope">
     content
     <t t-esc="scope.bool"/>
