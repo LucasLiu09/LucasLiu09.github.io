@@ -9,4 +9,5 @@
 - 不定期更新
 
 [GitHub](/)
+[项目管理](/project_manager/README.md)
 [Odoo](/odoo/README.md)
