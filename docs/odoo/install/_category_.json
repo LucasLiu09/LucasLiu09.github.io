@@ -1,0 +1,9 @@
+{
+  "label": "部署/配置",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "title": "Odoo 部署/配置",
+    "description": "Odoo的安装部署及配置"
+  }
+}

@@ -1,0 +1,7 @@
+odoo:
+  label: 'Odoo'
+  permalink: '/odoo'
+  description: 'Odoo - ERP'
+
+projectManager:
+  label: 'Project Manager'
