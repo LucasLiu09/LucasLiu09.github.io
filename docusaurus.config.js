@@ -88,7 +88,7 @@ const config = {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
             position: 'left',
-            label: 'Tutorial',
+            label: 'Docusaurus',
           },
           {
             type: 'docSidebar',
@@ -125,7 +125,7 @@ const config = {
               },
               {
                 label: '项目管理',
-                to: 'docs/intro',
+                to: 'docs/project_manager',
               },
             ],
           },
