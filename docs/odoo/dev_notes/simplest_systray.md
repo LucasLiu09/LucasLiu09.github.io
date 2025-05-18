@@ -3,10 +3,12 @@ title: 系统托盘-最小示例
 description: 系统托盘的最小产品的代码
 sidebar_label: 系统托盘-最小示例
 keywords:
-  - docs
-  - odoo development
+- docs
+- odoo development
 tags: [odoo]
+
 ---
+
 # 系统托盘-最小示例
 
 1. **编写Component**
@@ -32,7 +34,6 @@ const systrayItem = {
 
 registry.category("systray").add("new_systray", systrayItem, {sequence: 10});
 ```
-
 
 2. **编写模版**
 

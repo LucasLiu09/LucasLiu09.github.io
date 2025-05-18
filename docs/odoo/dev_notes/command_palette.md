@@ -3,10 +3,12 @@ title: CommandPalette
 description: Ctrl + K 调出的控制台
 sidebar_label: CommandPalette
 keywords:
-  - docs
-  - odoo development
+- docs
+- odoo development
 tags: [odoo]
+
 ---
+
 ## CommandPalette<!-- {docsify-ignore} -->
 
 通过ctrl + K 调出的控制台。
@@ -94,7 +96,6 @@ commandProviderRegistry.add("menu", {
         return result;
     },
 });
-
 ```
 
 ## 源码解析<!-- {docsify-ignore} -->

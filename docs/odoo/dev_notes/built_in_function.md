@@ -3,10 +3,12 @@ title: 内置函数
 description: 整理一些Odoo常用的内置函数
 sidebar_label: 内置函数
 keywords:
-  - docs
-  - odoo development
+- docs
+- odoo development
+
 tags: [odoo]
 ---
+
 ## write()与update()的区别
 
 `write()` 方法：
@@ -22,34 +24,43 @@ tags: [odoo]
 - 如果你需要在一个伪记录上设置字段值（即尚未在数据库中创建的记录，onchange 方法返回数据库中尚不存在的伪记录），你应该使用 update() 方法。
 
 所以，总结一下：
+
 - 如果你需要同时<strong style={{color: 'red'}}>更新多个记录</strong>的多个字段，使用 `write()`。
 - 如果你只需要在<strong style={{color: 'red'}}>单个记录</strong>上更新特定字段，或者在<strong style={{color: 'red'}}>伪记录</strong>上设置字段值，使用`update()`
 
 ## get_view
+
 可通过template动态向view插入内容。
 
-!> （`fields_view_get`也可实现相同需求，但官方提示`fields_view_get`将丢弃，用`get_view`代替）
+:::warning
+
+（`fields_view_get`也可实现相同需求，但官方提示`fields_view_get`将丢弃，用`get_view`代替）
+
+:::
 
 - 通过template渲染添加的内容
-```html
-<?xml version="1.0" encoding="UTF-8" ?>
-<odoo>
-		<!-- qweb 语法 -->
-		<!-- 可通过后端传params，在此处通过qweb语法引用 -->
-		<!-- t-att t-attf -->
+  
+  ```html
+  <?xml version="1.0" encoding="UTF-8" ?>
+  <odoo>
+        <!-- qweb 语法 -->
+        <!-- 可通过后端传params，在此处通过qweb语法引用 -->
+        <!-- t-att t-attf -->
     <template id="template_id">
         <field name="field" readonly="1" context="{}"/>
-				<button/>
-			<!-- other tags -->
+                <button/>
+            <!-- other tags -->
     </template>
-
-
-</odoo>
-```
+  </odoo>
+  ```
+  
+  ```
+  
+  ```
 
 ```python
 class XXX():
-	
+
     @api.model
     def get_view(self, view_id=None, view_type="form", **options):
         res = super(CbSoDtSearchWizard, self).get_view(view_id=view_id, view_type=view_type, **options)
@@ -87,7 +98,7 @@ def _merge_view_fields(all_models: dict, new_models: dict):
 
 ```python
 class XXX():
-	
+
     @api.model
     def get_view(self, view_id=None, view_type="form", **options):
         res = super(XXX, self).get_view(view_id=view_id, view_type=view_type, **options)
@@ -120,9 +131,9 @@ def _merge_view_fields(all_models: dict, new_models: dict):
         else:
             all_models[model] = tuple(view_fields)
 ```
-
-!> 以上插入子节点的操作可以改成以下处理方式更合适，将`etree.SubElement`替换成`etree.Element`然后在通过`append`插入到尾部。
-
+:::info
+以上插入子节点的操作可以改成以下处理方式更合适，将`etree.SubElement`替换成`etree.Element`然后在通过`append`插入到尾部。
+:::
 ```python
 @api.model
 def get_view(self, view_id=None, view_type="form", **options):
@@ -140,7 +151,7 @@ def get_view(self, view_id=None, view_type="form", **options):
                 div[0].append(new_node)
                 # 此处postprocess_and_fields只能对新增的节点处理，否则会影响原xml其他节点设置的属性。
                 new_arch, new_models = View.postprocess_and_fields(new_node, self._name)
-                _merge_view_fields(all_models, new_models)			
+                _merge_view_fields(all_models, new_models)            
         res["arch"] = etree.tostring(new_arch)
         res["models"] = frozendict(all_models)
     return res
@@ -151,6 +162,7 @@ def get_view(self, view_id=None, view_type="form", **options):
 通过修改`get_view`来全局设置`record`的字段只读
 
 场景: 
+
 - 当记录的状态=已锁定，记录不可编辑。
 
 ```python
@@ -208,7 +220,6 @@ class Base(models.AbstractModel):
 
         res['arch'] = etree.tostring(doc, encoding='unicode')
         return res
-
 ```
 
 ## user_has_groups
@@ -217,12 +228,12 @@ class Base(models.AbstractModel):
 
 ```python
 @api.model
-def user_has_groups(self, groups):	
-	# groups 为','分隔的群组名，包括所在模块， module_name.group_name
-	# 判断当前用户是否存在这些群组中，是则返回True，否则返回False
-	# 如果在groups中以"!,"开头，则取否。即如果用户存在这些群组中，返回False，否则返回True
-	# 也可以解释为，如果当前用户不存在这些群组中，则返回True，反之则返回False
-	....
+def user_has_groups(self, groups):    
+    # groups 为','分隔的群组名，包括所在模块， module_name.group_name
+    # 判断当前用户是否存在这些群组中，是则返回True，否则返回False
+    # 如果在groups中以"!,"开头，则取否。即如果用户存在这些群组中，返回False，否则返回True
+    # 也可以解释为，如果当前用户不存在这些群组中，则返回True，反之则返回False
+    ....
 
 self.user_has_groups(group_name)
 self.user_has_groups(!group_name)
@@ -255,11 +266,11 @@ from odoo.osv import expression
 @api.model
 def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get_uid=None):
     args = list(args or [])
-    if self._context.get('xxxx'):	# 通过context控制影响范围
+    if self._context.get('xxxx'):    # 通过context控制影响范围
         domain = []
         if name:
             # 添加额外的搜索条件my_field
-	        domain = expression.OR([args, [('my_field', operator, name)]])
+            domain = expression.OR([args, [('my_field', operator, name)]])
         # 添加额外的过滤条件
         domain = expression.AND([('state', '!=', 'cancelled')])
         return super()._name_search(name=name, args=domain, operator=operator, limit=limit, name_get_uid=name_get_uid)
@@ -280,96 +291,97 @@ def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get
 ### 重写的场景<!-- {docsify-ignore} -->
 
 1. 动态修改字段属性
-
+   
    **场景**：根据用户权限或某些条件动态修改字段属性(如只读、必填等)
-
+   
    ```python
    from odoo import models, api
    
    class SaleOrder(models.Model):
        _inherit = 'sale.order'
-       
+   
        @api.model
        def fields_get(self, allfields=None, attributes=None):
            res = super(SaleOrder, self).fields_get(allfields, attributes)
-           
+   
            # 如果用户不是经理，使某些字段只读
            if not self.env.user.has_group('sales_team.group_sale_manager'):
                for field_name in ['discount', 'payment_term_id']:
                    if field_name in res:
                        res[field_name]['readonly'] = True
-                       
+   
            return res
    ```
 
 2. 隐藏敏感字段
-
+   
    **场景**：根据用户角色隐藏敏感或内部字段
-
+   
    ```python
    class HrEmployee(models.Model):
        _inherit = 'hr.employee'
-       
+   
        @api.model
        def fields_get(self, allfields=None, attributes=None):
            res = super(HrEmployee, self).fields_get(allfields, attributes)
-           
+   
            # 非HR用户看不到薪资相关字段
            if not self.env.user.has_group('hr.group_hr_user'):
                for field in ['salary', 'bank_account_id', 'ssnid']:
                    if field in res:
                        del res[field]
-                       
+   
            return res
    ```
 
 3. 动态字段依赖
-
+   
    **场景**：根据其他系统配置动态改变字段属性
-
+   
    ```python
    class ProductProduct(models.Model):
        _inherit = 'product.product'
-       
+   
        @api.model
        def fields_get(self, allfields=None, attributes=None):
            res = super(ProductProduct, self).fields_get(allfields, attributes)
-           
+   
            # 如果公司启用了多仓库，显示仓库相关字段
            multi_warehouse = self.env['ir.config_parameter'].get_param('stock.multi_warehouse')
            if multi_warehouse == 'False':
                for field in ['warehouse_id', 'stock_location_id']:
                    if field in res:
                        res[field]['invisible'] = True
-                       
+   
            return res
    ```
 
 4. 自定义字段描述
-
+   
    场景：根据上下文或用户语言动态修改字段描述
-
+   
    ```python
    class ProjectTask(models.Model):
        _inherit = 'project.task'
-       
+   
        @api.model
        def fields_get(self, allfields=None, attributes=None):
            res = super(ProjectTask, self).fields_get(allfields, attributes)
-           
+   
            # 根据用户语言提供不同的帮助文本
            lang = self.env.context.get('lang', 'en_US')
            if lang == 'fr_FR':
                if 'deadline' in res:
                    res['deadline']['help'] = "Date limite pour terminer cette tâche"
-           
-           return res
    
-       
+           return res
+   ```
+   ```python
    class Product(models.Model):
+   
        _inherit = "product.product"
        
-   	@api.model
+       @api.model
        def fields_get(self, allfields=None, attributes=None):
            res = super().fields_get(allfields, attributes)
            if self._context.get('location') and isinstance(self._context['location'], int):
@@ -398,32 +410,30 @@ def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get
                    if res.get('qty_available'):
                        res['qty_available']['string'] = _('Produced Qty')
            return res
-   ```
 
+```
 5. 限制字段导出
 
-   **场景**：不允许导出敏感或内部信息。（也可以在字段定义时设置属性`exportable=False`）
+**场景**：不允许导出敏感或内部信息。（也可以在字段定义时设置属性`exportable=False`）
 
-   ```python
-   def _get_export_disable_fields(self):
-       '''不允许导出的字段'''
-       disable_fields_1 = ['field1', 'field2', 'field3']
-       return disable_fields_1
-   
-   @api.model
-   def fields_get(self, fields=None, attributes=None):
-       """
-           fields[name].update(exportable=False, ) 将不允许导出的字段的exportable修改为False
-       """
-       fields = super(hr_employee, self).fields_get(fields, attributes=attributes)
-       for name in self._get_export_disable_fields():
-           if name not in fields:
-               continue
-           fields[name].update(exportable=False, )
-       return fields
-   ```
+```python
+def _get_export_disable_fields(self):
+    '''不允许导出的字段'''
+    disable_fields_1 = ['field1', 'field2', 'field3']
+    return disable_fields_1
 
-   
+@api.model
+def fields_get(self, fields=None, attributes=None):
+    """
+        fields[name].update(exportable=False, ) 将不允许导出的字段的exportable修改为False
+    """
+    fields = super(hr_employee, self).fields_get(fields, attributes=attributes)
+    for name in self._get_export_disable_fields():
+        if name not in fields:
+            continue
+        fields[name].update(exportable=False, )
+    return fields
+```
 
 ## _check_recursion
 
@@ -433,15 +443,14 @@ def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get
 from odoo.exceptions import ValidationError
 
 class modelA(models.Model):
-    
+
     parent_id = fields.Many2one()
-    
+
     # 函数名称可以自定义(_check_hierarchy)
     @api.constrains('parent_id')
     def _check_hierarchy(self):
          if not self._check_recursion():
              raise models.ValidationError('Error! You cannot create recursive categories.')
-
 ```
 
 ## @api.ondelete
@@ -510,39 +519,37 @@ def ondelete(*, at_uninstall):
     return attrsetter('_ondelete', at_uninstall)
 ```
 
-
-
 ## fields_view_get
 
 !> 在odoo16版本已经开始弃用fields_view_get，用get_view代替。
 
 > **Model.fields_view_get([view_id | view_type='form'])**
->
+> 
 > Get the detailed composition of the requested view like fields, model, view architecture
->
+> 
 > **Parameters**
->
+> 
 > - **view_id** (int) – id of the view or None
 > - **view_type** (str) – type of the view to return if view_id is None (‘form’, ‘tree’, …)
 > - **toolbar** (bool) – true to include contextual actions
 > - **submenu** – deprecated
->
+> 
 > **Returns**
->
+> 
 > composition of the requested view (including inherited views and extensions)
->
+> 
 > **Return type：**dict
->
-> **Raises:**	
->
+> 
+> **Raises:**    
+> 
 > AttributeError –
->
+> 
 > if the inherited view has unknown position to work with other than ‘before’, ‘after’, ‘inside’, ‘replace’
->
+> 
 > if some tag other than ‘position’ is found in parent view
->
+> 
 > Invalid ArchitectureError – 
->
+> 
 > if there is view type other than form, tree, calendar, search etc defined on the structure
 
 ### 用法<!-- {docsify-ignore} -->
@@ -569,13 +576,13 @@ def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu
         doc = etree.XML(ret_val['arch'])
         for field in ret_val['fields']:
             for node in doc.xpath("//field[@name='%s']" % field):
-            	# 设置只读
+                # 设置只读
                 node.set("readonly", "1")
                 modifiers = json.loads(node.get("modifiers"))
                 modifiers['readonly'] = True
                 node.set("modifiers", json.dumps(modifiers))
         for node in doc.xpath("//button"):
-        	# 设置不可见, 不修改modifiers不生效。
+            # 设置不可见, 不修改modifiers不生效。
             node.set("invisible", "1")
             if node.get("modifiers"):
                 modifiers = json.loads(node.get("modifiers"))
@@ -594,15 +601,15 @@ def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu
 
 ```python
 def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):  
-	res = super(xxx, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,submenu=False)  
-	if res['type']=="form":  
-		id = res['id']  
-		//根据id去取得资料，并进行判断  
-		if 条件成立:  
-			doc = etree.XML(res['arch'])  
-			doc.xpath("//form")[0].set("edit","false")  
-			res['arch']=etree.tostring(doc)  
-	return res 
+    res = super(xxx, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,submenu=False)  
+    if res['type']=="form":  
+        id = res['id']  
+        //根据id去取得资料，并进行判断  
+        if 条件成立:  
+            doc = etree.XML(res['arch'])  
+            doc.xpath("//form")[0].set("edit","false")  
+            res['arch']=etree.tostring(doc)  
+    return res 
 ```
 
 动态增加field
@@ -610,7 +617,7 @@ def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu
 ```python
 @api.model
 def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
-	res = super(xxx, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,submenu=False)  
+    res = super(xxx, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,submenu=False)  
     doc = etree.XML(res['arch'])
     summary = doc.xpath("//field[@name='product_id']")
     if len(summary):
@@ -619,8 +626,8 @@ def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu
                                                 'string':'title of new field',
                                                 'nolabel':'0',
                                                 }))
-		# 添加子标签
-		# etree.SubElement() 
+        # 添加子标签
+        # etree.SubElement() 
     res['arch'] = etree.tostring(doc) 
     return res
 ```
@@ -630,7 +637,7 @@ def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu
 ```python
 class product_product(osv.osv):
   _inherit = 'product.product'
-   
+
   def fields_view_get(self, view_id=None, view_type='form', toolbar=False,submenu=False):
     """
     Changes the view dynamically
@@ -640,7 +647,7 @@ class product_product(osv.osv):
     ret_val = super(product_product, self).fields_view_get(view_id, view_type, toolbar,submenu)
     if view_type == 'form':
       doc = etree.XML(ret_val['arch'], parser=None, base_url=None)
-       
+
       #要加入到视图里的page
       _moves_arch_lst = """
         <page string='Feature'>
@@ -659,27 +666,26 @@ class product_product(osv.osv):
 
 ```python
 """
-	Add domain 'allow_check_writting = True' on journal_id field 
-	and remove 'widget = selection' on the same field 
-	because the dynamic domain is not allowed on such widget
+    Add domain 'allow_check_writting = True' on journal_id field 
+    and remove 'widget = selection' on the same field 
+    because the dynamic domain is not allowed on such widget
 """
 if not context: 
     context = {}
 res = super(account_voucher, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar, submenu=submenu)
 doc = etree.XML(res['arch'])
 nodes = doc.xpath("//field[@name='journal_id']")
- 
+
 # 检查context是否有指定的标志（write_check）
 if context.get('write_check', False) :
-	for node in nodes:
-	 
-		# 动态修改 journal_id 这个field的domain
-		node.set('domain', "[('type', '=', 'bank'), ('allow_check_writing','=',True),('your_field','=','value')]")
-		 
-		# 把 widget 清空，原因在上面已经说了
-		node.set('widget', '')
-		 
-	res['arch'] = etree.tostring(doc)
+    for node in nodes:
+
+        # 动态修改 journal_id 这个field的domain
+        node.set('domain', "[('type', '=', 'bank'), ('allow_check_writing','=',True),('your_field','=','value')]")
+
+        # 把 widget 清空，原因在上面已经说了
+        node.set('widget', '')
+
+    res['arch'] = etree.tostring(doc)
 return res
 ```
-

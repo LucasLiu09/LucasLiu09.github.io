@@ -4,10 +4,12 @@ description: 插件：支持搜索菜单以及添加菜单书签的系统托盘
 sidebar_label: 系统托盘：快速搜索菜单/Bookmark
 hide_table_of_contents: true
 keywords:
-  - docs
-  - odoo development
+- docs
+- odoo development
 tags: [odoo]
+
 ---
+
 # 系统托盘：快速搜索菜单/Bookmark
 
 步骤说明：
@@ -22,6 +24,7 @@ tags: [odoo]
 8. 支持不同命名空间来搜索不同类型的项目("@"、"/")
 
 书签管理：
+
 1. 定义新的Component: QuickMenuMark，接收props: data (data接收来自于QuickMenuSystray的data，避免二次获取)
 2. 编写托盘的template
 3. 获取当前用户已保存的书签
@@ -45,6 +48,6 @@ tags: [odoo]
 
 ![query menu namespace](./_images/quick_menu_3.png "query menu namespace")
 
-
 ## 代码<!-- {docsify-ignore} -->
+
 > [github](https://github.com/LucasLiu09/odoo-module-lucas/tree/16.0/quick_menu_systray)

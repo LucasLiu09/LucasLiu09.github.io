@@ -3,10 +3,12 @@ title: 一些Owl的说明
 description: OWL - A web framework for structured, dynamic and maintainable applications.
 sidebar_label: 一些Owl的说明
 keywords:
-  - docs
-  - odoo development
+- docs
+- odoo development
 tags: [odoo]
+
 ---
+
 # 一些Owl的说明
 
 ## slots
@@ -172,6 +174,3 @@ Slot params 的工作方式与普通 props 类似，因此可以使用 `.transla
 ```
 
 slot values的工作方式与普通props类似，因此可以根据需要使用 `.bind` 后缀来绑定函数。
-
-
-

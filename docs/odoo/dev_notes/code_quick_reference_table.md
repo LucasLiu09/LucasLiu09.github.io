@@ -1,0 +1,155 @@
+---
+title: 代码速查表
+description: 代码片段
+sidebar_label: 代码速查表
+keywords:
+- docs
+- odoo development
+tags: [odoo]
+
+---
+
+# 代码速查表<!-- {docsify-ignore-all} -->
+
+## 后端
+
+### Domain
+
+`from odoo.osv import expression`
+
+- expression.AND(domains)
+- expression.OR(domains)
+
+### One2many/Many2many Command
+
+对于x2m的关联关系，通过更直观的命名函数执行更具有可读性，以此替代三元组首位为整数的方式。
+
+`from odoo import Command` or `from odoo.fields import Command`
+
+- `Command.create(values)`: 传入values, 创建新的记录并关联到当前记录。
+
+- `Command.update(id, values)`: 传入id、values，修改关联记录的数据。
+
+- `Command.delete(id)`: 传入id，移除关联关系。
+
+- `Command.unlink(id)`: 传入id，移除关联关系并删除指定id的记录集。
+
+- `Command.link(id)`: 传入id，添加关联关系。
+
+- `Command.clear()`: 移除所有关联关系。
+
+- `Command.set(ids)`: 传入ids，先移除所有关联关系，再将所有ids添加关联。
+
+### return ir.actions.client
+
+- display_notification（右上角提示窗）
+
+```python
+return {
+    'type': 'ir.actions.client',
+    'tag': 'display_notification',
+    'params': {
+        'type': 'success',                # 提示窗类型，可选项: success/danger/warning/info/...
+        'title': _("Leads Assigned"),    # 标题
+        'message': 'Message, %s',
+        'next': {                        # 在services.notification.add之后返回next的action
+            'type': 'ir.actions.act_window_close'
+        },
+        'links': [{                        # 在message中通过%s占位符设置一个a标签
+            'label': production.name,
+            'url': f'#action={action.id}&id={production.id}&model=mrp.production'
+        }],
+        'sticky': True,        # 是否滞留提示窗，需要手工关闭。
+    }
+}
+```
+
+### 通过/web/export/路由快速实现导出excel
+
+摘自odoo17,其他版本待核实。
+
+```python
+import json
+from urllib.parse import urlencode
+
+def export_xlsx(self):
+    params = {
+        "data": json.dumps({
+            "domain": domain,    
+            "fields": export_fields,    # 导出的列会按照这个列表的顺序
+            "groupby": [],
+            "ids": False,
+            "import_compat": False,
+            "model": "sale.order",
+        })
+    }
+    params_json = json.dumps(params)
+    return {
+        "name": "Sale Order",
+        "type": "ir.actions.act_url",
+        "url": '/web/export/xlsx?%s' % urlencode(params),
+        "target": "new",
+    }
+```
+
+## 前端
+
+### Search View - Filter 筛选日期周期
+
+```xml
+<filter string="当天" name="today"  domain="[('create_date','>=', time.strftime('%Y-%m-%d 00:00:00')),('create_date', '<', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+
+<filter string="本周" name="last_week"  domain="[('create_date','>', (context_today() - datetime.timedelta(weeks=1)).strftime('%%Y-%%m-%%d 00:00:00'))]"/>
+
+<filter string="本月" name="month" domain="[('create_date','>=', time.strftime('%Y-%m-01 00:00:00')),('create_date','<',  (context_today() + relativedelta(months=1)).strftime('%Y-%m-01 00:00:00'))]"/>
+
+<filter string="上月" name="month2"  domain="[('create_date','<', time.strftime('%Y-%m-01 00:00:00')),('create_date','>=',  (context_today() - relativedelta(months=1)).strftime('%Y-%m-01 00:00:00'))]"/>
+
+<filter string="本年" name="year"  domain="[('create_date','<=', time.strftime('%Y-12-31 23:59:59')),('create_date','>=', time.strftime('%Y-01-01 00:00:00'))]"/>
+
+
+
+<separator/>
+
+<filter name="过去24小时" string="Last 24h" domain="[('create_date','>', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d 00:00:00') )]"/>
+
+<filter name="上周" string="Last Week" domain="[('create_date','>', (context_today() - datetime.timedelta(weeks=1)).strftime('%Y-%m-%d 00:00:00'))]"/>
+
+<!--另一种写法-->
+
+<separator/>
+
+<filter name="week" string="本周"
+
+        domain="[
+
+            '&',
+
+            ('create_date', '>=', (context_today() + relativedelta(weeks=-1,days=1,weekday=0)).strftime('%Y-%m-%d')),
+
+            ('create_date', '<=', (context_today() + relativedelta(weekday=6)).strftime('%Y-%m-%d')),
+
+        ]"/>
+
+<filter name="month" string="本月"
+
+        domain="[
+
+            '&',
+
+            ('create_date', '>=', (context_today() + relativedelta(day=1)).strftime('%Y-%m-%d')),
+
+            ('create_date', '<=', (context_today() + relativedelta(months=1, day=1, days=-1)).strftime('%Y-%m-%d')),
+
+        ]"/>
+
+```
+
+### Search View - Searchpanel
+
+```xml
+<searchpanel>
+  <field name="category_id" limit="20" select="one" icon="fa-list-ul" enable_counters="1" hierarchize="1"/>
+  <field name="tag_ids" limit="20" select="multi" icon="fa-tags" enable_counters="1"/>
+</searchpanel>
+```
