@@ -63,11 +63,30 @@ const sidebars = {
             'odoo/dev_notes/models/constraints',
           ]
         },
-        'odoo/dev_notes/check_credentials',
-        'odoo/dev_notes/command_palette',
-        'odoo/dev_notes/simplest_systray',
-        'odoo/dev_notes/systray_quick_menu',
-        'odoo/dev_notes/some_owl_usages',
+        {
+          type: 'category',
+          label: 'Odoo原生解析',
+          items: [
+            'odoo/dev_notes/check_credentials',
+            'odoo/dev_notes/xml_rpc',
+            'odoo/dev_notes/command_palette',
+          ]
+        },
+        {
+          type: 'category',
+          label: '前端',
+          items: [
+            'odoo/dev_notes/some_owl_usages',
+          ]
+        },
+        {
+          type: 'category',
+          label: 'Custom Module',
+          items: [
+            'odoo/dev_notes/simplest_systray',
+            'odoo/dev_notes/systray_quick_menu',
+          ]
+        },
         'odoo/dev_notes/translate',
         'odoo/dev_notes/code_quick_reference_table',
       ]

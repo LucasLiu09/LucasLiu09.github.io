@@ -11,6 +11,10 @@ tags: [odoo]
 
 ## CommandPalette<!-- {docsify-ignore} -->
 
+:::info[版本]
+当前只验证了Odoo16版本。16以前的版本不一定有，之后的版本也可能存在改名的情况。
+:::
+
 通过ctrl + K 调出的控制台。
 
 ![command](./_images/command_palette_1.png "command")
