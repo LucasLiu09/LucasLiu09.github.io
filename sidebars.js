@@ -89,6 +89,7 @@ const sidebars = {
         },
         'odoo/dev_notes/translate',
         'odoo/dev_notes/code_quick_reference_table',
+        'odoo/dev_notes/python_code_snippet',
       ]
     }
   ],
