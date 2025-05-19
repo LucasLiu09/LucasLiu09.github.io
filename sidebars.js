@@ -76,7 +76,11 @@ const sidebars = {
           type: 'category',
           label: '前端',
           items: [
-            'odoo/dev_notes/some_owl_usages',
+            'odoo/dev_notes/front-end/some_owl_usages',
+            'odoo/dev_notes/front-end/owl_use_external_libraries',
+            'odoo/dev_notes/front-end/owl_confirmation_dialog_with_input',
+            'odoo/dev_notes/front-end/owl_record_filter',
+            'odoo/dev_notes/front-end/views/x2many_treeview_unlink_button_position',
           ]
         },
         {
