@@ -89,6 +89,7 @@ const sidebars = {
           items: [
             'odoo/dev_notes/simplest_systray',
             'odoo/dev_notes/systray_quick_menu',
+            'odoo/dev_notes/x2many_list_export_all',
           ]
         },
         'odoo/dev_notes/translate',
