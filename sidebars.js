@@ -81,6 +81,7 @@ const sidebars = {
             'odoo/dev_notes/front-end/owl_confirmation_dialog_with_input',
             'odoo/dev_notes/front-end/owl_record_filter',
             'odoo/dev_notes/front-end/views/x2many_treeview_unlink_button_position',
+            'odoo/dev_notes/front-end/views/listview_select_same_group_records',
           ]
         },
         {
