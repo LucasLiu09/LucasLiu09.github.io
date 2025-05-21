@@ -70,6 +70,7 @@ const sidebars = {
             'odoo/dev_notes/check_credentials',
             'odoo/dev_notes/xml_rpc',
             'odoo/dev_notes/command_palette',
+            'odoo/dev_notes/file_viewer_v17',
           ]
         },
         {
