@@ -469,7 +469,9 @@ Dropdown.template = "web.Dropdown";
 </details>
 
 #### props
-:::tip[Dropdown.props]
+:::tip[Note]
+**Dropdown.props**
+
 - **`class`**(string): div-root标签的class属性。
 - **`toggler`**(string): 触发dropdown的元素。若不设置该props，则默认使用div-root内的button作为触发元素。可以设置`toggler="'parent'"`，则变成div-root的父标签作为触发元素，组件会在`this.rootRef.el.parentElement`添加click监听事件。
 - **`skipTogglerTabbing`**(boolean): 是否将toggler Button设置为不可通过tab键获得焦点。未设置视为可通过tab键聚焦。
@@ -624,7 +626,9 @@ DropdownItem.defaultProps = {
 </details>
 
 #### props
-:::tip[DropdownItem.props]
+:::tip[Note]
+**DropdownItem.props**
+
 - **`onSelected`**(Function): 点击DropdownItem时调用的function。
 - **`class`**(string): DropdownItem标签的class属性。
 - **`parentClosingMode`**(string): 父级Dropdown关闭方式。(可选值：None/ClosestParent/AllParents， 默认：AllParents)
