@@ -2,6 +2,7 @@
 title: Dropdown / DropdownItem
 description: 深入解析Dropdown / DropdownItem
 sidebar_label: Dropdown / DropdownItem
+toc_max_heading_level: 4
 keyword:
     - odoo
     - odoo development
@@ -15,6 +16,7 @@ last_update:
 
 :::info[Note]
 深入解析Odoo组件：Dropdown、DropdownItem。
+
 -- version: odoo16
 :::
 
@@ -467,27 +469,26 @@ Dropdown.template = "web.Dropdown";
 </details>
 
 #### props
-Dropdown.props:
-- **class**(string): div-root标签的class属性。
-- **toggler**(string): 触发dropdown的元素。若不设置该props，则默认使用div-root内的button作为触发元素。可以设置`toggler="'parent'"`，则变成div-root的父标签作为触发元素，组件会在`this.rootRef.el.parentElement`添加click监听事件。
-- **skipTogglerTabbing**(boolean): 是否将toggler Button设置为不可通过tab键获得焦点。未设置视为可通过tab键聚焦。
-- **startOpen**(boolean): 是否默认打开dropdown。未设置则默认为false。
-- **manualOnly**(boolean): 是否只通过手动打开/关闭dropdown(即点击Dropdown以外元素不会关闭Dropdown显示的内容，只能通过点击Dropdown的toggler button或选中内部元素执行的变化来打开/关闭)。未设置则默认视为自动。
-- **menuClass**(string): dropdown-menu标签的class属性。
-- **beforeOpen**(function): dropdown打开前的回调函数。(通常可以做一些预处理操作)
-- **togglerClass**(string): toggler按钮的class属性。
-- **hotkey**(string): 触发dropdown的快捷键。
-- **tooltip**(string): 鼠标移入dropdown时显示的提示信息(tooltip)，tooltip优先级高于title。
-- **title**(string): 鼠标移入dropdown时显示的提示信息(title)。
-- **position**(string): dropdown打开内容的位置。
-- **slots**(object): dropdown的插槽。(用法可见[动态slots](/docs/odoo/dev_notes/front-end/some_owl_usages#%E5%8A%A8%E6%80%81slots))
-- **showCaret**(boolean): 是否显示下拉箭头。
+:::tip[Dropdown.props]
+- **`class`**(string): div-root标签的class属性。
+- **`toggler`**(string): 触发dropdown的元素。若不设置该props，则默认使用div-root内的button作为触发元素。可以设置`toggler="'parent'"`，则变成div-root的父标签作为触发元素，组件会在`this.rootRef.el.parentElement`添加click监听事件。
+- **`skipTogglerTabbing`**(boolean): 是否将toggler Button设置为不可通过tab键获得焦点。未设置视为可通过tab键聚焦。
+- **`startOpen`**(boolean): 是否默认打开dropdown。未设置则默认为false。
+- **`manualOnly`**(boolean): 是否只通过手动打开/关闭dropdown(即点击Dropdown以外元素不会关闭Dropdown显示的内容，只能通过点击Dropdown的toggler button或选中内部元素执行的变化来打开/关闭)。未设置则默认视为自动。
+- **`menuClass`**(string): dropdown-menu标签的class属性。
+- **`beforeOpen`**(function): dropdown打开前的回调函数。(通常可以做一些预处理操作)
+- **`togglerClass`**(string): toggler按钮的class属性。
+- **`hotkey`**(string): 触发dropdown的快捷键。
+- **`tooltip`**(string): 鼠标移入dropdown时显示的提示信息(tooltip)，tooltip优先级高于title。
+- **`title`**(string): 鼠标移入dropdown时显示的提示信息(title)。
+- **`position`**(string): dropdown打开内容的位置。
+- **`slots`**(object): dropdown的插槽。(用法可见[动态slots](/docs/odoo/dev_notes/front-end/some_owl_usages#%E5%8A%A8%E6%80%81slots))
+- **`showCaret`**(boolean): 是否显示下拉箭头。
+:::
 
 ## DropdownItem
 
 ### template
-
-**源码：dropdown_item.xml**
 
 主体内容为`<span>`或`<a>`标签。
 
@@ -520,7 +521,7 @@ Dropdown.props:
 
 核心逻辑在于`props.onSelected`，在点击DropdownItem时，其click事件绑定的function中会调用`props.onSelected()`。
 
-如果props.href设置了值，则DropdownItem会渲染为`<a>`标签，否则渲染为`<span>`标签。
+如果`props.href`设置了值，则DropdownItem会渲染为`<a>`标签，否则渲染为`<span>`标签。
 
 <details>
     <summary>**源码：dropdown_item.js**</summary>
@@ -623,12 +624,13 @@ DropdownItem.defaultProps = {
 </details>
 
 #### props
-DropdownItem.props:
-- **onSelected**(Function): 点击DropdownItem时调用的function。
-- **class**(string): DropdownItem标签的class属性。
-- **parentClosingMode**(string): 父级Dropdown关闭方式。(可选值：None/ClosestParent/AllParents， 默认：AllParents)
-- **hotkey**(string): 触发DropdownItem的快捷键。
-- **href**(string): DropdownItem的href属性。
-- **slots**(object): DropdownItem的插槽。(用法可见[动态slots](/docs/odoo/dev_notes/front-end/some_owl_usages#%E5%8A%A8%E6%80%81slots))
-- **title**(string): 鼠标移入DropdownItem时显示的提示信息(title)。
-- **dataset**(object): DropdownItem的data-*属性。
+:::tip[DropdownItem.props]
+- **`onSelected`**(Function): 点击DropdownItem时调用的function。
+- **`class`**(string): DropdownItem标签的class属性。
+- **`parentClosingMode`**(string): 父级Dropdown关闭方式。(可选值：None/ClosestParent/AllParents， 默认：AllParents)
+- **`hotkey`**(string): 触发DropdownItem的快捷键。
+- **`href`**(string): DropdownItem的href属性。
+- **`slots`**(object): DropdownItem的插槽。(用法可见[动态slots](/docs/odoo/dev_notes/front-end/some_owl_usages#%E5%8A%A8%E6%80%81slots))
+- **`title`**(string): 鼠标移入DropdownItem时显示的提示信息(title)。
+- **`dataset`**(object): DropdownItem的data-*属性。
+:::
