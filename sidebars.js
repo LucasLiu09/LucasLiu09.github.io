@@ -69,6 +69,7 @@ const sidebars = {
           items: [
             'odoo/dev_notes/check_credentials',
             'odoo/dev_notes/xml_rpc',
+            'odoo/dev_notes/utils_search_fuzzyLookup',
             'odoo/dev_notes/owl_dropdown',
             'odoo/dev_notes/command_palette',
             'odoo/dev_notes/file_viewer_v17',
