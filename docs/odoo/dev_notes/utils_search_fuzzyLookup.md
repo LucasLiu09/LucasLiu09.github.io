@@ -15,7 +15,9 @@ last_update:
 
 :::info[Note]
 Return a list of things that matches a pattern, ordered by their 'score' (higher score first). 
+
 An higher score means that the match is better. 
+
 For example, consecutive letters are considered a better match.
 :::
 
@@ -25,7 +27,7 @@ For example, consecutive letters are considered a better match.
 import { fuzzyLookup } from "@web/core/utils/search";
 ```
 
-## 参数说明：
+## 参数说明
 `fuzzyLookup(pattern, list, fn)`
 - `pattern`: The pattern to match.
 - `list`: The list of things to match.
