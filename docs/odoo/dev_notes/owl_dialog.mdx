@@ -97,6 +97,7 @@ function add(dialogClass, props, options = {}){
 
 <Tabs groupId="dialog_source_code">
   <TabItem value="dialog js" label="dialog.js">
+
 ```javascript title="addons/web/static/src/core/dialog/dialog.js"
 /** @odoo-module **/
 
@@ -161,8 +162,10 @@ Dialog.defaultProps = {
 };
 
 ```
+
   </TabItem>
   <TabItem value="dialog xml" label="dialog.xml">
+
 ```xml title="addons/web/static/src/core/dialog/dialog.xml"
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
@@ -216,8 +219,10 @@ Dialog.defaultProps = {
 </templates>
 
 ```
+
   </TabItem>
   <TabItem value="dialog_container js" label="dialog_container.js">
+
 ```javascript title="addons/web/static/src/core/dialog/dialog_container.js"
 /** @odoo-module **/
 
@@ -250,8 +255,10 @@ DialogContainer.template = xml`
     </div>
 `;
 ```
+
   </TabItem>
   <TabItem value="dialog_service js" label="dialog_service.js">
+
 ```javascript title="addons/web/static/src/core/dialog/dialog_service.js"
 /** @odoo-module **/
 
@@ -335,6 +342,7 @@ export const dialogService = {
 };
 
 registry.category("services").add("dialog", dialogService);
+
 ```
   </TabItem>
 </Tabs>
