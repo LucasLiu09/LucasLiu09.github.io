@@ -1,0 +1,344 @@
+---
+title: OWL - Dialog
+description: 解析OWL - Dialog
+sidebar_label: OWL - Dialog
+keyword:
+    - odoo
+    - odoo development
+tags: [odoo]
+last_update:
+  date: 2025/5/26
+  author: Lucas
+---
+import Tabs from '@theme/Tabs';
+
+import TabItem from '@theme/TabItem';
+
+#  OWL - Dialog
+
+:::info[Note]
+OWL - Dialog
+
+--version: 16.0
+:::
+
+## Dialog模板(xml)
+
+首先来看Dialog的模板，整体结构可以划分成`header`/`main`/`footer`，其中`header`/`footer`可以不显示，`main`是必然会显示的。
+
+Dialog有三个`slot`: (按需通过`t-set-slot`修改)
+1. `default`: 弹窗主体内容
+2. `header`: 弹窗顶部
+3. `footer`: 弹窗底部
+
+**header:**
+
+header中默认内容主要是title信息与关闭按钮。
+
+> （如果需要对Dialog的header进行修改，可以通过`slot`进行修改；或者修改Dialog的template：`web.Dialog.header`）
+
+**main:**
+
+弹窗主体部分。由于main标签内是slot(default), 所以可以直接在`<Dialog></Dialog>`标签内直接添加内容。
+
+**footer:**
+
+弹窗底部部分，默认内容是一个确定按钮。通常自定义button会修改`footer`，通过`t-set-slot`进行修改。
+
+## Dialog组件(js)
+
+Dialog.props:
+
+| name | 说明 | 默认值 |
+| --- | --- | --- |
+| `contentClass` | 弹窗最外层div样式 | `""` |
+| `bodyClass` | 弹窗main主体样式 | `""` |
+| `fullscreen` | 是否全屏 | `false` |
+| `footer` | 是否显示底部 | `true` |
+| `header` | 是否显示头部 | `true` |
+| `size` | 弹窗大小 | `"lg"` |
+| `technical` | 是否技术弹窗 | `true` |
+| `title` | 弹窗标题 | `"Odoo"` |
+| `modalRef` | 弹窗引用 | |
+| `slots` | Slot | |
+| `withBodyPadding` | 是否有弹窗主体padding | `true` |
+
+## dialogService
+
+dialogService可以通过一下方式调用：
+```javascript
+import { useService, useOwnedDialogs } from "@web/core/utils/hooks";
+// ...
+
+class XX extends Component {
+    setup() {
+        this.dialogService = useService("dialog");
+        // this.dialogService.add();
+        this.addDialog = useOwnedDialogs();
+        // this.addDialog = this.dialogService.add;
+    }
+}
+
+```
+
+`dialogService`提供一个`add`函数来打开Dialog页面。
+```javascript
+function add(dialogClass, props, options = {}){
+    // ...
+}
+```
+
+`add`函数接收三个参数：
+1. `dialogClass`: Dialog组件
+2. `props`: Dialog参数
+3. `options`: 弹窗配置项（原生只处理一个参数：onClose，该参数的类型为function，作用为点击弹窗关闭按钮/默认按钮时调用）
+
+## 源码
+
+<Tabs groupID="dialog_source_code">
+  <TabItem value="dialog.js" label="dialog.js">
+```javascript title="addons/web/static/src/core/dialog/dialog.js"
+/** @odoo-module **/
+
+import { useHotkey } from "@web/core/hotkeys/hotkey_hook";
+import { useActiveElement } from "../ui/ui_service";
+import { useForwardRefToParent } from "@web/core/utils/hooks";
+
+import { Component, useChildSubEnv, useState } from "@odoo/owl";
+export class Dialog extends Component {
+    setup() {
+        this.modalRef = useForwardRefToParent("modalRef");
+        useActiveElement("modalRef");
+        this.data = useState(this.env.dialogData);
+        useHotkey("escape", () => {
+            this.data.close();
+        });
+        this.id = `dialog_${this.data.id}`;
+        useChildSubEnv({ inDialog: true, dialogId: this.id, closeDialog: this.data.close });
+
+        owl.onWillDestroy(() => {
+            if (this.env.isSmall) {
+                this.data.scrollToOrigin();
+            }
+        });
+    }
+
+    get isFullscreen() {
+        return this.props.fullscreen || this.env.isSmall;
+    }
+}
+Dialog.template = "web.Dialog";
+Dialog.props = {
+    contentClass: { type: String, optional: true },
+    bodyClass: { type: String, optional: true },
+    fullscreen: { type: Boolean, optional: true },
+    footer: { type: Boolean, optional: true },
+    header: { type: Boolean, optional: true },
+    size: { type: String, optional: true, validate: (s) => ["sm", "md", "lg", "xl"].includes(s) },
+    technical: { type: Boolean, optional: true },
+    title: { type: String, optional: true },
+    modalRef: { type: Function, optional: true },
+    slots: {
+        type: Object,
+        shape: {
+            default: Object, // Content is not optional
+            header: { type: Object, optional: true },
+            footer: { type: Object, optional: true },
+        },
+    },
+    withBodyPadding: { type: Boolean, optional: true },
+};
+Dialog.defaultProps = {
+    contentClass: "",
+    bodyClass: "",
+    fullscreen: false,
+    footer: true,
+    header: true,
+    size: "lg",
+    technical: true,
+    title: "Odoo",
+    withBodyPadding: true,
+};
+
+```
+  </TabItem>
+  <TabItem value="dialog.xml" label="dialog.xml">
+```xml title="addons/web/static/src/core/dialog/dialog.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="web.Dialog" owl="1">
+        <div class="o_dialog" t-att-id="id" t-att-class="{ o_inactive_modal: !data.isActive }">
+            <div role="dialog" class="modal d-block"
+                tabindex="-1"
+                t-att-class="{ o_technical_modal: props.technical, o_modal_full: isFullscreen }"
+                t-ref="modalRef"
+                >
+                <div class="modal-dialog" t-attf-class="modal-{{props.size}}">
+                    <div class="modal-content" t-att-class="props.contentClass">
+                        <header t-if="props.header" class="modal-header">
+                            <t t-slot="header" close="data.close" isFullscreen="isFullscreen">
+                                <t t-call="web.Dialog.header">
+                                    <t t-set="close" t-value="data.close"/>
+                                    <t t-set="fullscreen" t-value="isFullscreen"/>
+                                </t>
+                            </t>
+                        </header>
+                        <!-- FIXME: WOWL there is a bug on t-portal on owl, in which t-portal don't work on multinode.
+                        To avoid this we place the footer before the body -->
+                        <footer t-if="props.footer" class="modal-footer justify-content-around justify-content-sm-start flex-wrap gap-1" style="order:2">
+                            <t t-slot="footer" close="data.close">
+                                <button class="btn btn-primary o-default-button" t-on-click="data.close">
+                                    <t>Ok</t>
+                                </button>
+                            </t>
+                        </footer>
+                        <main class="modal-body" t-attf-class="{{ props.bodyClass }} {{ !props.withBodyPadding ? 'p-0': '' }}">
+                            <t t-slot="default" close="data.close" />
+                        </main>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="web.Dialog.header" owl="1">
+        <t t-if="fullscreen">
+            <button class="btn fa fa-arrow-left" data-bs-dismiss="modal" aria-label="Close" t-on-click="close" />
+        </t>
+        <h4 class="modal-title text-break" t-att-class="{ 'me-auto': fullscreen }">
+            <t t-esc="props.title"/>
+        </h4>
+        <t t-if="!fullscreen">
+            <button type="button" class="btn-close" aria-label="Close" tabindex="-1" t-on-click="close"></button>
+        </t>
+    </t>
+</templates>
+
+```
+  </TabItem>
+  <TabItem value="dialog_container.js" label="dialog_container.js">
+```javascript title="addons/web/static/src/core/dialog/dialog_container.js"
+/** @odoo-module **/
+
+import { ErrorHandler, WithEnv } from "../utils/components";
+
+import { Component, xml } from "@odoo/owl";
+
+export class DialogContainer extends Component {
+    handleError(error, dialog) {
+        dialog.props.close();
+        Promise.resolve().then(() => {
+            throw error;
+        });
+    }
+}
+DialogContainer.components = { ErrorHandler, WithEnv };
+//Legacy : The div wrapping the t-foreach, is placed to avoid owl to delete non-owl dialogs.
+//This div can be removed after removing all legacy dialogs.
+DialogContainer.template = xml`
+    <div class="o_dialog_container" t-att-class="{'modal-open': Object.keys(props.dialogs).length > 0}">
+        <div>
+            <t t-foreach="Object.values(props.dialogs)" t-as="dialog" t-key="dialog.id">
+                <ErrorHandler onError="(error) => this.handleError(error, dialog)">
+                    <WithEnv env="{ dialogData: dialog.dialogData }">
+                        <t t-component="dialog.class" t-props="dialog.props"/>
+                    </WithEnv>
+                </ErrorHandler>
+            </t>
+        </div>
+    </div>
+`;
+```
+  </TabItem>
+  <TabItem value="dialog_service.js" label="dialog_service.js">
+```javascript title="addons/web/static/src/core/dialog/dialog_service.js"
+/** @odoo-module **/
+
+import { registry } from "../registry";
+import { DialogContainer } from "./dialog_container";
+
+import { markRaw, reactive } from "@odoo/owl";
+
+/**
+ *  @typedef {{
+ *      onClose?(): void;
+ *  }} DialogServiceInterfaceAddOptions
+ */
+/**
+ *  @typedef {{
+ *      add(
+ *          Component: any,
+ *          props: {},
+ *          options?: DialogServiceInterfaceAddOptions
+ *      ): () => void;
+ *  }} DialogServiceInterface
+ */
+
+export const dialogService = {
+    /** @returns {DialogServiceInterface} */
+    start(env) {
+        const dialogs = reactive({});
+        let dialogId = 0;
+
+        registry.category("main_components").add("DialogContainer", {
+            Component: DialogContainer,
+            props: { dialogs },
+        });
+
+        function add(dialogClass, props, options = {}) {
+            for (const dialog of Object.values(dialogs)) {
+                dialog.dialogData.isActive = false;
+            }
+            const id = ++dialogId;
+            function close() {
+                if (dialogs[id]) {
+                    delete dialogs[id];
+                    Object.values(dialogs).forEach((dialog, i, dialogArr) => {
+                        dialog.dialogData.isActive = i === dialogArr.length - 1;
+                    });
+                    if (options.onClose) {
+                        options.onClose();
+                    }
+                }
+            }
+
+            const dialog = {
+                id,
+                class: dialogClass,
+                props: markRaw({ ...props, close }),
+                dialogData: {
+                    isActive: true,
+                    close,
+                    id,
+                },
+            };
+            const scrollOrigin = { top: window.scrollY, left: window.scrollX };
+            dialog.dialogData.scrollToOrigin = () => {
+                if (!Object.keys(dialogs).length) {
+                    window.scrollTo(scrollOrigin);
+                }
+            };
+            dialogs[id] = dialog;
+
+            return close;
+        }
+
+        function closeAll() {
+            for (const id in dialogs) {
+                dialogs[id].dialogData.close();
+            }
+        }
+
+        return { add, closeAll };
+    },
+};
+
+registry.category("services").add("dialog", dialogService);
+```
+  </TabItem>
+</Tabs>
+
+
+
+
