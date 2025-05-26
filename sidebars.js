@@ -82,6 +82,7 @@ const sidebars = {
           items: [
             'odoo/dev_notes/front-end/some_owl_usages',
             'odoo/dev_notes/front-end/owl_custom_page_simple',
+            'odoo/dev_notes/front-end/owl_create_dialog',
             'odoo/dev_notes/front-end/owl_use_external_libraries',
             'odoo/dev_notes/front-end/owl_confirmation_dialog_with_input',
             'odoo/dev_notes/front-end/owl_record_filter',
