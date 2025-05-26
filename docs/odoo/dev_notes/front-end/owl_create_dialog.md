@@ -122,5 +122,5 @@ export class NewComponent extends Component {
 ![2](../_images/owl_create_dialog_2.png)
 
 :::tip[Note]
-关于Dialog的解析见文档
+关于Dialog的解析见[文档](odoo/dev_notes/owl_dialog.mdx)
 :::
