@@ -79,7 +79,7 @@ NewDialog.props = {
 </templates>
 ```
 
-### 使用Dialog
+### 使用Dialog {#use-dialog}
 
 这里通过[自定义界面](/odoo/dev_notes/front-end/owl_custom_page_simple.md)来调用创建的Dialog弹窗。
 
@@ -137,7 +137,7 @@ export class NewComponent extends Component {
 
 ### extends Dialog
 
-此处示例在header处添加一个icon。调用方式见**[`使用Dialog`](#使用Dialog)**
+此处示例在header处添加一个icon。调用方式见**[`使用Dialog`](#use-dialog)**
 
 ```javascript
 /** @odoo-module **/
