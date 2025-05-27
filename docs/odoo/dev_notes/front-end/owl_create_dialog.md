@@ -174,6 +174,11 @@ NewDialogExtends.template = "NewDialogExtends";
 </templates>
 ```
 
+:::warning[Note]
+- `t-inherit-mode="primary"`：基于父模板生成新的模板。
+- `t-inherit-mode="extension"`：修改父模板。
+:::
+
 ### 效果图
 
 ![3](../_images/owl_create_dialog_3.png)
