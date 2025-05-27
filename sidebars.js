@@ -81,17 +81,30 @@ const sidebars = {
           type: 'category',
           label: '前端',
           items: [
-            'odoo/dev_notes/front-end/some_owl_usages',
-            'odoo/dev_notes/front-end/owl_custom_page_simple',
-            'odoo/dev_notes/front-end/owl_create_dialog',
-            'odoo/dev_notes/front-end/owl_use_external_libraries',
-            'odoo/dev_notes/front-end/owl_confirmation_dialog_with_input',
-            'odoo/dev_notes/front-end/owl_record_filter',
-            'odoo/dev_notes/front-end/views/x2many_treeview_unlink_button_position',
-            'odoo/dev_notes/front-end/views/listview_select_same_group_records',
-            'odoo/dev_notes/front-end/views/form_view_do_not_auto_save',
-            'odoo/dev_notes/front-end/views/disable_for_view_useEffect_v16',
-            'odoo/dev_notes/front-end/views/form_view_record_readonly_domain_thinking_v16',
+           {
+             type: 'category',
+             label: 'OWL',
+             items: [
+                'odoo/dev_notes/front-end/some_owl_usages',
+                'odoo/dev_notes/front-end/owl_custom_page_simple',
+                'odoo/dev_notes/front-end/owl_create_dialog',
+                'odoo/dev_notes/front-end/owl_use_external_libraries',
+                'odoo/dev_notes/front-end/owl_confirmation_dialog_with_input',
+                'odoo/dev_notes/front-end/owl_record_filter',
+             ]
+           },
+           {
+             type: 'category',
+             label: 'Views',
+             items: [
+                'odoo/dev_notes/front-end/views/x2many_treeview_unlink_button_position',
+                'odoo/dev_notes/front-end/views/listview_select_same_group_records',
+                'odoo/dev_notes/front-end/views/form_view_do_not_auto_save',
+                'odoo/dev_notes/front-end/views/disable_for_view_useEffect_v16',
+                'odoo/dev_notes/front-end/views/form_view_record_readonly_domain_thinking_v16',
+             ]
+           },
+            
           ]
         },
         {
