@@ -7,7 +7,7 @@ keyword:
     - odoo development
 tags: [odoo]
 last_update:
-  date: 2025/5/26
+  date: 2025/5/27
   author: Lucas
 ---
 
@@ -17,11 +17,17 @@ last_update:
 从0开始创建一个新的Dialog弹窗
 :::
 
+这里介绍两种方法来创建新的Dialog弹窗：
+1. 创建新的组件(内嵌Dialog)
+2. 继承Dialog生成新的Dialog
+
+## 创建新的组件(内嵌Dialog)
+
 步骤：
 1. 编写组件
 2. 编写模板
 
-## 编写组件
+### 编写组件
 
 1. 编写新的组件
 2. 导入Dialog、将Dialog添加到组件的子组件中。
@@ -58,7 +64,7 @@ NewDialog.props = {
 
 ```
 
-## 编写模板
+### 编写模板
 
 ```xml title="new_dialog.xml"
 <?xml version="1.0" encoding="UTF-8" ?>
@@ -73,7 +79,7 @@ NewDialog.props = {
 </templates>
 ```
 
-## 使用Dialog
+### 使用Dialog
 
 这里通过[自定义界面](/odoo/dev_notes/front-end/owl_custom_page_simple.md)来调用创建的Dialog弹窗。
 
@@ -124,3 +130,50 @@ export class NewComponent extends Component {
 :::tip[Note]
 关于Dialog的解析见[文档](odoo/dev_notes/owl_dialog.mdx)
 :::
+
+## 继承Dialog生成新的Dialog
+
+**继承Dialog，通过修改Dialog的模板来修改Dialog的内容。**
+
+### extends Dialog
+
+此处示例在header处添加一个icon。调用方式见**[`使用Dialog`](#使用Dialog)**
+
+```javascript
+/** @odoo-module **/
+
+import { Dialog } from "@web/core/dialog/dialog";
+
+export class NewDialogExtends extends Dialog{
+    // ...
+}
+
+
+NewDialogExtends.template = "NewDialogExtends";
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+    <t t-name="NewDialogExtends.header" t-inherit="web.Dialog.header" t-inherit-mode="primary" owl="1">
+        <xpath expr="//h4[contains(concat(' ',normalize-space(@class),' '),' modal-title ')]" position="after">
+          <i class="fa fa-home ms-2 text-primary"/>
+        </xpath>
+    </t>
+
+    <t t-name="NewDialogExtends" owl="1" t-inherit="web.Dialog" t-inherit-mode="primary">
+        <xpath expr="//t[@t-slot='header']" position="replace">
+            <t t-call="NewDialogExtends.header">
+                <t t-set="close" t-value="props.close"/>
+                <t t-set="fullscreen" t-value="props.isFullscreen"/>
+            </t>
+        </xpath>
+    </t>
+
+</templates>
+```
+
+### 效果图
+
+![3](../_images/owl_create_dialog_3.png)
