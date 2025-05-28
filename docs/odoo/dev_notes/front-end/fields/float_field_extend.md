@@ -23,6 +23,13 @@ Float Field扩展:
 
 ## 数据显示及必填检查
 
+通过分析查找出`addons/web/static/src/views/basic_relational_model.js`以下位置的代码会处理数据的必填校验。
+此处可以看出检查必填时是通过`FieldComponent.isSet`这个function处理。所以只需要做出以下修改(若需求为正数，也可通过修改此处实现)：
+```javascript
+FloatFieldFormat.isSet = (value) => value !== 0;
+```
+![check_validity](../../_images/basic_relational_model_check_validity.png)
+
 ```javascript title="float_field_extend.js"
 /** @odoo-module **/
 
