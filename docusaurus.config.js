@@ -154,6 +154,13 @@ const config = {
         theme: prismThemes.github,
         darkTheme: prismThemes.dracula,
       },
+      algolia:{
+        appId: 'R4SYYWL693',
+        apiKey: '6cf932422043ac87c4e1e7efb5db3445',
+        indexName: 'lucasliu09io',
+        // Optional: see doc section below
+        contextualSearch: true,
+      },
     }),
 };
 
