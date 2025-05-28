@@ -105,7 +105,14 @@ const sidebars = {
                 'odoo/dev_notes/front-end/views/form_view_record_readonly_domain_thinking_v16',
              ]
            },
-            
+           {
+             type: 'category',
+             label: 'Fields',
+             items: [
+                'odoo/dev_notes/front-end/fields/integer_field_extend',
+                'odoo/dev_notes/front-end/fields/float_field_extend',
+             ]
+           },
           ]
         },
         {
