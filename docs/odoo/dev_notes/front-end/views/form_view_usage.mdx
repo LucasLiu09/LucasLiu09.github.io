@@ -1,0 +1,298 @@
+---
+title: Form View的一些玩法
+description: Form View的一些玩法
+sidebar_label: Form View的一些玩法
+keyword:
+    - odoo
+    - odoo development
+tags: [odoo]
+last_update:
+  date: 2025/5/28
+  author: Lucas
+---
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Form View的一些玩法
+
+:::info[Note]
+介绍一些关于FormView的玩法。
+> 如无特殊说明，默认使用16的版本。
+
+:::
+
+## 修改FormControlPanel，增加可用Slot
+
+> 这里示例的版本为16。
+
+<details>
+    <summary>源码</summary>
+    
+    <Tabs>
+        
+        <TabItem value="form_view_js" label="form_view.js">
+            
+```javascript title="addons/web/static/src/views/form/form_view.js"
+/** @odoo-module **/
+
+import { registry } from "@web/core/registry";
+import { FormRenderer } from "./form_renderer";
+import { RelationalModel } from "../basic_relational_model";
+import { FormArchParser } from "./form_arch_parser";
+import { FormController } from "./form_controller";
+import { FormCompiler } from "./form_compiler";
+import { FormControlPanel } from "./control_panel/form_control_panel";
+
+export const formView = {
+    type: "form",
+    display_name: "Form",
+    multiRecord: false,
+    searchMenuTypes: [],
+    ControlPanel: FormControlPanel,
+    Controller: FormController,
+    Renderer: FormRenderer,
+    ArchParser: FormArchParser,
+    Model: RelationalModel,
+    Compiler: FormCompiler,
+    buttonTemplate: "web.FormView.Buttons",
+
+    props: (genericProps, view) => {
+        const { ArchParser } = view;
+        const { arch, relatedModels, resModel } = genericProps;
+        const archInfo = new ArchParser().parse(arch, relatedModels, resModel);
+
+        return {
+            ...genericProps,
+            Model: view.Model,
+            Renderer: view.Renderer,
+            buttonTemplate: genericProps.buttonTemplate || view.buttonTemplate,
+            Compiler: view.Compiler,
+            archInfo,
+        };
+    },
+};
+
+registry.category("views").add("form", formView);
+
+```
+            
+        </TabItem>
+    
+        <TabItem value="form_controller_xml" label="form_controller.xml">
+            
+```xml title="addons/web/static/src/views/form/form_controller.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="web.FormView" owl="1">
+        <div t-att-class="className" t-ref="root">
+            <div class="o_form_view_container">
+                <Layout className="model.useSampleModel ? 'o_view_sample_data' : ''" display="display">
+                    <t t-set-slot="layout-buttons">
+                        <t t-if="footerArchInfo and env.inDialog">
+                            <t t-component="props.Renderer" record="model.root" Compiler="props.Compiler" archInfo="footerArchInfo" enableViewButtons.bind="enableButtons" disableViewButtons.bind="disableButtons"/>
+                        </t>
+                        <t t-else="">
+                            <t t-call="{{ props.buttonTemplate }}"/>
+                        </t>
+                    </t>
+                    <t t-set-slot="control-panel-action-menu">
+                        <t t-if="props.info.actionMenus">
+                            <ActionMenus
+                                getActiveIds="() => model.root.isVirtual ? [] : [model.root.resId]"
+                                context="props.context"
+                                items="getActionMenuItems()"
+                                isDomainSelected="model.root.isDomainSelected"
+                                resModel="model.root.resModel"
+                                domain="props.domain"
+                                onActionExecuted="() => model.load({ resId: model.root.resId, resIds: model.root.resIds })"
+                                shouldExecuteAction.bind="shouldExecuteAction"
+                            />
+                        </t>
+                    </t>
+                    <t t-set-slot="control-panel-status-indicator">
+                        <t t-if="canEdit">
+                            <FormStatusIndicator model="model" discard.bind="discard" save.bind="saveButtonClicked" isDisabled="state.isDisabled" fieldIsDirty="state.fieldIsDirty" />
+                        </t>
+                    </t>
+                    <t t-set-slot="control-panel-create-button">
+                        <t t-if="canCreate">
+                            <button type="button" class="btn btn-outline-primary o_form_button_create" data-hotkey="c" t-on-click.stop="create" t-att-disabled="state.isDisabled">New</button>
+                        </t>
+                    </t>
+                    <t t-component="props.Renderer" record="model.root" Compiler="props.Compiler" archInfo="archInfo" setFieldAsDirty.bind="setFieldAsDirty" enableViewButtons.bind="enableButtons" disableViewButtons.bind="disableButtons" onNotebookPageChange.bind="onNotebookPageChange" activeNotebookPages="props.state and props.state.activeNotebookPages"/>
+                </Layout>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="web.FormView.Buttons" owl="1">
+        <div class="o_cp_buttons" role="toolbar" aria-label="Main actions" t-ref="cpButtons">
+            <div t-if="model.root.isInEdition" class="o_form_buttons_edit">
+                <button type="button" class="btn btn-primary o_form_button_save" data-hotkey="s" t-on-click.stop="() => this.saveButtonClicked({closable: true})">
+                    Save
+                </button>
+                <button type="button" class="btn btn-secondary o_form_button_cancel" data-hotkey="j" t-on-click.stop="discard">
+                    Discard
+                </button>
+                <button t-if="props.removeRecord" class="btn btn-secondary o_form_button_remove" t-on-click="props.removeRecord" data-hotkey="x">
+                    Remove
+                </button>
+            </div>
+            <div t-elif="canCreate" class="o_form_buttons_view">
+                <button type="button" class="btn btn-secondary o_form_button_create" data-hotkey="c" t-on-click.stop="create">
+                    New
+                </button>
+            </div>
+        </div>
+    </t>
+</templates>
+
+```
+            
+        </TabItem>
+
+        <TabItem value="layout_xml" label="layout.xml">
+            
+```xml title="addons/web/static/src/search/layout.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="web.Layout" owl="1">
+        <t t-if="env.inDialog" t-portal="'#' + env.dialogId + ' .modal-footer'">
+            <t t-slot="layout-buttons"/>
+        </t>
+        <t t-component="components.ControlPanel" slots="controlPanelSlots" t-if="display.controlPanel" display="display.controlPanel"/>
+        <t t-component="components.Banner" t-if="display.banner"/>
+        <div t-ref="content" class="o_content" t-attf-class="{{props.className}}" t-att-class="{ o_component_with_search_panel: display.searchPanel }">
+            <t t-component="components.SearchPanel" t-if="display.searchPanel"/>
+            <t t-slot="default" contentRef="contentRef" />
+        </div>
+    </t>
+
+</templates>
+
+```
+            
+        </TabItem>
+
+        <TabItem value="form_control_panel_xml" label="form_control_panel.xml">
+            
+```xml title="addons/web/static/src/views/form/control_panel/form_control_panel.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="web.FormControlPanel" owl="1">
+        <div class="o_control_panel" t-ref="root">
+            <div t-if="display['top']" class="o_cp_top" t-att-class="{ 'flex-wrap': env.isSmall }">
+                <div class="o_cp_top_left d-flex flex-grow-1 align-items-center" t-att-class="{ 'w-100': env.isSmall }">
+                    <t t-if="display['top-left']">
+                        <t t-slot="control-panel-breadcrumb">
+                            <t t-if="env.isSmall">
+                                <t t-call="web.Breadcrumbs.Small" t-if="!env.config.noBreadcrumbs"/>
+                            </t>
+                            <t t-else="">
+                                <t t-call="web.Breadcrumbs" t-if="!env.config.noBreadcrumbs"/>
+                            </t>
+                        </t>
+                    </t>
+                </div>
+                <div class="o_cp_bottom_right w-auto flex-shrink-0 justify-content-between align-items-center"
+                     t-att-class="{ 'flex-grow-1' : env.isSmall }">
+                    <t t-if="env.isSmall">
+                        <t t-slot="control-panel-status-indicator" />
+                    </t>
+                    <t t-slot="control-panel-action-menu" t-if="display['bottom-left']"/>
+                    <div t-if="pagerProps and pagerProps.total > 0" class="o_cp_pager" role="search">
+                        <Pager t-props="pagerProps"/>
+                    </div>
+                    <t t-slot="control-panel-create-button" />
+                </div>
+            </div>
+        </div>
+    </t>
+
+</templates>
+
+```
+            
+        </TabItem>
+
+    </Tabs>
+    
+</details>
+
+首先来看FormView的组成结构：
+
+![2](/docs/odoo/dev_notes/images/form_view_usage_2.png)
+
+-> FormController
+----> Layout
+------> FormControlPanel
+------> FormRenderer
+
+主体内容通过`Layout`渲染.
+
+:::info[Note]
+
+Layout的组成结构：
+
+- t-slot: layout-buttons
+- t-component: components.ControlPanel (slots="controlPanelSlots")
+- t-component: components.Banner
+- t-component: components.SearchPanel
+- t-slot: dafault
+
+:::
+
+在`FormView`中，顶部内容属于`ControlPanel`，如下图所示：
+![1](/docs/odoo/dev_notes/images/form_view_usage_1.png)
+
+`ControlPanel`: `FormControlPanel`.
+
+那么接下来看`FormControlPanel`:
+
+`FormControlPanel`有以下几个可用的Slot：
+- control-panel-breadcrumb
+- control-panel-status-indicator
+- control-panel-action-menu
+- control-panel-create-button
+
+此处展示在`FormControlPanel`的`control-panel-action-menu`前面插入一个Slot以供后续使用。
+
+```xml title="form_control_panel_inherit.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="form_view_search.FormControlPanel" owl="1" t-inherit="web.FormControlPanel" t-inherit-mode="extension">
+        <xpath expr="//t[@t-slot='control-panel-action-menu']" position="before">
+            <t t-slot="control-panel-search"/>
+        </xpath>
+    </t>
+
+</templates>
+```
+
+下面给出一个示例，在新增的Slot中设置内容(此处用的是自定义组件FormViewSearch)：
+
+```xml title="form_controller_inherit.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="form_view_search.FormView" owl="1" t-inherit="web.FormView" t-inherit-mode="extension">
+        <xpath expr="//Layout" position="inside">
+            <t t-set-slot="control-panel-search">
+                <t t-if="props.archInfo.enableFormViewSearch">
+                    <FormViewSearch model="model" domain="props.domain"
+                                    enableFormViewSearch="archInfo.enableFormViewSearch"
+                                    formViewSearchCode="archInfo.formViewSearchCode"/>
+                </t>
+            </t>
+        </xpath>
+    </t>
+
+</templates>
+```
+
+效果图如下：
+![3](/docs/odoo/dev_notes/images/form_view_usage_3.png)
