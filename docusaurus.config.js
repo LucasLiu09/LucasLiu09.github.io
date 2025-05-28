@@ -48,6 +48,8 @@ const config = {
           // Remove this to remove the "edit this page" links.
           editUrl:
             'https://github.com/LucasLiu09/LucasLiu09.github.io/blob/main',
+          showLastUpdateAuthor: true,
+          showLastUpdateTime: true,
         },
         blog: false,
 //        blog: {
