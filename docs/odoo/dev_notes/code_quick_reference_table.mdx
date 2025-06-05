@@ -92,9 +92,9 @@ def export_xlsx(self):
     }
 ```
 
-### 通过_auto_init新建索引(index)
+### 通过_auto_init/init新建索引(index)
 
-使用示例: 以下在hh_leave表上新增一条索引。此处用到odoo.tools.sql.craete_index(可以通过`from odoo.tools import create_index`引用)。
+使用示例: 以下是原生代码在hh_leave表上新增一条索引。此处用到odoo.tools.sql.craete_index(可以通过`from odoo.tools import create_index`引用)。
 
 ```python title="addons/hr_holidays/models/hr_leave.py"
     def _auto_init(self):
@@ -104,8 +104,8 @@ def export_xlsx(self):
         return res
 ```
 
-:::note[tips]
-官方**更推荐将创建索引的操作放在`init`函数中**。因为`init`函数会在`_auto_init`之后被调用。
+::::note[tips]
+<span style={{Color: 'red'}}>官方**更推荐将创建索引的操作放在`init`函数中，**</span>因为`init`函数会在`_auto_init`之后被调用。
 
 <details>
     <summary>
@@ -113,6 +113,7 @@ def export_xlsx(self):
     </summary>
     
 :::info[Doc]
+
 Initialize the database schema of ``self``:
 - create the corresponding table,
 - create/update the necessary columns/tables for fields,
@@ -128,11 +129,12 @@ Also prepare post-init stuff to:
 Note: you should not override this method. Instead, you can modify
 the model's database schema by overriding method :meth:`~.init`,
 which is called right after this one.
+
 :::
     
 </details>
 
-:::
+::::
 
 `create_index`源码
 ```python title="odoo/tools/sql.py"
