@@ -1,7 +1,7 @@
 ---
-title: OWl - Patch
+title: OWL - Patch
 description: 在Qweb中使用Patch打一些补丁
-sidebar_label: OWl - Patch
+sidebar_label: OWL - Patch
 keywords:
 - odoo
 - odoo development
@@ -11,7 +11,7 @@ last_update:
   author: Lucas
 ---
 
-# OWl - Patch
+# OWL - Patch
 
 :::info[Note]
 阐述一下odoo各版本对patch的用法及差别。
