@@ -22,11 +22,11 @@ last_update:
 引用patch：
 `import { patch } from "@web/core/utils/patch";`
 
-`**patch(objToPatch, extension)**`
+**`patch(objToPatch, extension)`**
 
 :::tip[参数]
-- objobjToPatch (object()) – 需要patch的对象
-- extension (object()) – 将每个键映射到扩展的对象
+- `objobjToPatch (object())` – 需要patch的对象
+- `extension (object())` – 将每个键映射到扩展的对象
 
 return: 用于删除补丁的函数
 
@@ -151,13 +151,13 @@ patch(XXXComponent.prototype, "xxx.patch", patchObj);
 引用patch：
 `import { patch } from "@web/core/utils/patch";`
 
-`**patch(obj, patchName, patchValue, options)**`
+**`patch(obj, patchName, patchValue, options)`**
 
 :::tip[参数]
-- obj(Object()) - 需要patch的对象
-- patchName (string()) – 描述补丁的唯一字符串
-- patchValue (Object()) – 将每个键映射到 patch 值的对象
-- options (Object()) – option object (see below)
+- `obj(Object())` - 需要patch的对象
+- `patchName (string())` – 描述补丁的唯一字符串
+- `patchValue (Object())` – 将每个键映射到 patch 值的对象
+- `options (Object())` – option object (see below)
 :::
 
 ### Patching a javascript class
@@ -193,7 +193,7 @@ patch(MyComponent.prototype, "my patch", {
 
 `import { unpatch } from @web/core/utils/patch;`
 
-`**unpatch(obj, patchName)**`
+**`unpatch(obj, patchName)`**
 
 :::into[参数]
 - obj (Object()) – 取消取消patch的对象
