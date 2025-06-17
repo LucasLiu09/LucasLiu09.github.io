@@ -5,3 +5,6 @@ odoo:
 
 projectManager:
   label: 'Project Manager'
+
+git:
+  label: 'Git'
