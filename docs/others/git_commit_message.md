@@ -198,3 +198,12 @@ BREAKING CHANGE: Legacy login API is deprecated.
 
 ---
 
+
+:::tip[Tips]
+如果有使用项目管理工具，通常会创建对应的任务，并附有流水号(任务号)，在这种情况下就可以以流水号开头，更方便我们追溯任务。例如：
+
+```plaintext
+Task0103 - feat(auth): implement OAuth2 login
+```
+
+:::
