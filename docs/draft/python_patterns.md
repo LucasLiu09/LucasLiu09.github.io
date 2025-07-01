@@ -867,3 +867,105 @@ class ValidatingLazyProperty(lazy_property):
 5. 考虑内存：大对象缓存需谨慎，可添加清理机制
 
 此模式广泛应用于 Django、SQLAlchemy 等大型框架，是优化 Python 程序性能的有效手段。
+
+## pool
+
+**预先实例化并维护一组相同类型的实例**
+
+```python
+"""
+*What is this pattern about?
+This pattern is used when creating an object is costly (and they are
+created frequently) but only a few are used at a time. With a Pool we
+can manage those instances we have as of now by caching them. Now it
+is possible to skip the costly creation of an object if one is
+available in the pool.
+A pool allows to 'check out' an inactive object and then to return it.
+If none are available the pool creates one to provide without wait.
+
+*What does this example do?
+In this example queue.Queue is used to create the pool (wrapped in a
+custom ObjectPool object to use with the with statement), and it is
+populated with strings.
+As we can see, the first string object put in "yam" is USED by the
+with statement. But because it is released back into the pool
+afterwards it is reused by the explicit call to sample_queue.get().
+Same thing happens with "sam", when the ObjectPool created inside the
+function is deleted (by the GC) and the object is returned.
+
+*Where is the pattern used practically?
+
+*References:
+http://stackoverflow.com/questions/1514120/python-implementation-of-the-object-pool-design-pattern
+https://sourcemaking.com/design_patterns/object_pool
+
+*TL;DR
+Stores a set of initialized objects kept ready to use.
+"""
+
+
+class ObjectPool:
+    def __init__(self, queue, auto_get=False):
+        self._queue = queue
+        self.item = self._queue.get() if auto_get else None
+
+    def __enter__(self):
+        if self.item is None:
+            self.item = self._queue.get()
+        return self.item
+
+    def __exit__(self, Type, value, traceback):
+        if self.item is not None:
+            self._queue.put(self.item)
+            self.item = None
+
+    def __del__(self):
+        if self.item is not None:
+            self._queue.put(self.item)
+            self.item = None
+
+
+def main():
+    """
+    >>> import queue
+
+    >>> def test_object(queue):
+    ...    pool = ObjectPool(queue, True)
+    ...    print('Inside func: {}'.format(pool.item))
+
+    >>> sample_queue = queue.Queue()
+
+    >>> sample_queue.put('yam')
+    >>> with ObjectPool(sample_queue) as obj:
+    ...    print('Inside with: {}'.format(obj))
+    Inside with: yam
+
+    >>> print('Outside with: {}'.format(sample_queue.get()))
+    Outside with: yam
+
+    >>> sample_queue.put('sam')
+    >>> test_object(sample_queue)
+    Inside func: sam
+
+    >>> print('Outside func: {}'.format(sample_queue.get()))
+    Outside func: sam
+
+    if not sample_queue.empty():
+        print(sample_queue.get())
+    """
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
+```
+
+### 模式核心思想
+
+对象池模式的主要特点包括：
+
+- 资源复用：避免频繁创建销毁昂贵对象
+- 流量控制：限制并发资源数量
+- 性能优化：减少系统开销，提高响应速度
+- 对象管理：统一管理对象的生命周期
