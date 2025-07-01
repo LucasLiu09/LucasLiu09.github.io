@@ -1,4 +1,15 @@
-
+---
+title: Python设计模式
+description: Python设计模式
+sidebar_label: Python设计模式
+toc_max_heading_level: 4
+keyword:
+    - python
+tags: []
+last_update:
+  date: 2025/7/1
+  author: Lucas
+---
 
 # Python设计模式
 
