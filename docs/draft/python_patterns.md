@@ -150,7 +150,7 @@ class Building:
 **特点:**
 
 1. 模板方法模式组合使用：
-- 基类的__init__定义了固定构建顺序
+- 基类的`__init__`定义了固定构建顺序
 - 子类实现具体构建步骤
 
 2. 具体产品实现:
@@ -311,3 +311,293 @@ class Director:
   - 需要严格分离构建步骤
 
 这个例子展示了Python实现设计模式的灵活性，既可以采用经典实现，也可以根据需求简化。理解这些变体有助于在实际开发中选择最合适的实现方式。
+
+
+## Borg (Monostate)
+
+**实例间共享状态的单例**
+
+> 以下代码来源于[Github-faif/python-patterns](https://github.com/faif/python-patterns/blob/master/patterns/creational/borg.py)
+> 
+```python
+"""
+*What is this pattern about?
+The Borg pattern (also known as the Monostate pattern) is a way to
+implement singleton behavior, but instead of having only one instance
+of a class, there are multiple instances that share the same state. In
+other words, the focus is on sharing state instead of sharing instance
+identity.
+
+*What does this example do?
+To understand the implementation of this pattern in Python, it is
+important to know that, in Python, instance attributes are stored in a
+attribute dictionary called __dict__. Usually, each instance will have
+its own dictionary, but the Borg pattern modifies this so that all
+instances have the same dictionary.
+In this example, the __shared_state attribute will be the dictionary
+shared between all instances, and this is ensured by assigning
+__shared_state to the __dict__ variable when initializing a new
+instance (i.e., in the __init__ method). Other attributes are usually
+added to the instance's attribute dictionary, but, since the attribute
+dictionary itself is shared (which is __shared_state), all other
+attributes will also be shared.
+
+*Where is the pattern used practically?
+Sharing state is useful in applications like managing database connections:
+https://github.com/onetwopunch/pythonDbTemplate/blob/master/database.py
+
+*References:
+- https://fkromer.github.io/python-pattern-references/design/#singleton
+- https://learning.oreilly.com/library/view/python-cookbook/0596001673/ch05s23.html
+- http://www.aleax.it/5ep.html
+
+*TL;DR
+Provides singleton-like behavior sharing state between instances.
+"""
+
+from typing import Dict
+
+
+class Borg:
+    _shared_state: Dict[str, str] = {}
+
+    def __init__(self) -> None:
+        self.__dict__ = self._shared_state
+
+
+class YourBorg(Borg):
+    def __init__(self, state: str = None) -> None:
+        super().__init__()
+        if state:
+            self.state = state
+        else:
+            # initiate the first instance with default state
+            if not hasattr(self, "state"):
+                self.state = "Init"
+
+    def __str__(self) -> str:
+        return self.state
+
+
+def main():
+    """
+    >>> rm1 = YourBorg()
+    >>> rm2 = YourBorg()
+
+    >>> rm1.state = 'Idle'
+    >>> rm2.state = 'Running'
+
+    >>> print('rm1: {0}'.format(rm1))
+    rm1: Running
+    >>> print('rm2: {0}'.format(rm2))
+    rm2: Running
+
+    # When the `state` attribute is modified from instance `rm2`,
+    # the value of `state` in instance `rm1` also changes
+    >>> rm2.state = 'Zombie'
+
+    >>> print('rm1: {0}'.format(rm1))
+    rm1: Zombie
+    >>> print('rm2: {0}'.format(rm2))
+    rm2: Zombie
+
+    # Even though `rm1` and `rm2` share attributes, the instances are not the same
+    >>> rm1 is rm2
+    False
+
+    # New instances also get the same shared state
+    >>> rm3 = YourBorg()
+
+    >>> print('rm1: {0}'.format(rm1))
+    rm1: Zombie
+    >>> print('rm2: {0}'.format(rm2))
+    rm2: Zombie
+    >>> print('rm3: {0}'.format(rm3))
+    rm3: Zombie
+
+    # A new instance can explicitly change the state during creation
+    >>> rm4 = YourBorg('Running')
+
+    >>> print('rm4: {0}'.format(rm4))
+    rm4: Running
+
+    # Existing instances reflect that change as well
+    >>> print('rm3: {0}'.format(rm3))
+    rm3: Running
+    """
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
+```
+
+深入解析这段实现Borg模式（也称为Monostate模式）的Python代码，这是一种特殊的共享状态模式，与单例模式有相似效果但实现方式不同。
+
+### Borg模式核心思想
+
+1. 多实例共享状态：允许创建多个实例，但这些实例共享相同的状态
+2. 与单例模式区别：
+- 单例：确保类只有一个实例
+- Borg：允许多个实例，但共享`__dict__`属性字典
+3. Python特性利用：通过操作实例的`__dict__`属性实现共享
+
+### 代码逐层解析
+
+**1. 基类实现：**
+   
+```python
+class Borg:
+    _shared_state: Dict[str, str] = {}  # 类变量存储共享状态
+
+    def __init__(self) -> None:
+        self.__dict__ = self._shared_state  # 关键：所有实例共享同一个字典
+
+```
+
+- `_shared_state`是所有实例共享的数据存储中心
+- 通过将实例的`__dict__`指向类变量实现状态共享
+- 这是Borg模式的核心技巧
+
+**2. 子类扩展：**
+
+```python
+class YourBorg(Borg):
+    def __init__(self, state: str = None) -> None:
+        super().__init__()  # 继承共享状态机制
+        if state:
+            self.state = state  # 修改共享状态
+        else:
+            if not hasattr(self, "state"):  # 首次初始化设置默认值
+                self.state = "Init"
+
+    def __str__(self) -> str:
+        return self.state
+
+```
+
+- 添加具体的状态管理逻辑
+- 提供字符串表示方法
+- 演示了如何在共享状态下进行条件初始化
+
+3. 测试案例展示的特性：
+```python
+>>> rm1 = YourBorg()
+>>> rm2 = YourBorg()
+>>> rm1.state = 'Idle'
+>>> rm2.state = 'Running'
+>>> print(rm1)  # 输出 Running
+>>> print(rm2)  # 输出 Running
+
+```
+
+- 修改任一实例的状态会影响所有实例
+- 实例不同(`rm1 is rm2`为False)但状态同步更新
+- 新创建的实例自动获得当前共享状态
+
+### 关键技术点详解
+
+**1. `__dict__`魔法：**
+
+- 在Python中，实例属性存储在`__dict__`中
+- 通过将`__dict__`指向同一个字典实现状态共享
+- 比传统单例模式更灵活，保持实例独立性
+
+**2. 线程安全考虑：**
+
+- 原始实现不是线程安全的
+- 实际使用中应添加锁机制
+
+```python
+from threading import Lock
+
+class ThreadSafeBorg(Borg):
+    _lock = Lock()
+    
+    def __init__(self):
+        with self._lock:
+            super().__init__()
+```
+
+### 与单例模式对比
+
+| 特性         | Borg模式               | 单例模式               |
+|--------------|------------------------|------------------------|
+| 实例数量     | 多个                   | 严格一个               |
+| 状态存储     | 共享`__dict__`         | 单个实例属性           |
+| 实例身份     | `is`比较返回False      | `is`比较返回True       |
+| 继承         | 子类可扩展             | 需要特殊处理继承       |
+| 使用场景     | 需要多实例但共享状态   | 严格限制单个实例       |
+
+### 实际应用场景
+
+1. 数据库连接池：
+```python
+class ConnectionPool(Borg):
+    def __init__(self):
+        super().__init__()
+        if not hasattr(self, "connections"):
+            self.connections = []
+            self._init_connections()
+    
+    def _init_connections(self):
+        # 初始化连接池
+        pass
+```
+
+2. 全局配置管理：
+```python
+class AppConfig(Borg):
+    def __init__(self):
+        super().__init__()
+        if not hasattr(self, "settings"):
+            self._load_default_settings()
+```
+
+3. 多窗口共享数据（GUI应用）：
+```python
+class SharedDocument(Borg):
+    def __init__(self):
+        super().__init__()
+        if not hasattr(self, "content"):
+            self.content = ""
+```
+
+### 模式优缺点
+
+**优点：**
+
+- 比传统单例更符合Python风格
+- 允许创建多个实例但保持状态一致
+- 子类化更方便，不破坏共享机制
+
+**缺点：**
+
+- 共享所有属性，可能造成意外副作用
+- 需要特别注意可变对象的修改
+- 原始实现线程不安全，需额外处理
+
+### 进阶扩展建议
+
+**1. 状态版本控制：**
+```python
+class VersionedBorg(Borg):
+    def __init__(self):
+        super().__init__()
+        if not hasattr(self, "_version"):
+            self._version = 0
+        self._version += 1
+```
+
+**2. 选择性共享属性：**
+```python
+class SelectiveBorg(Borg):
+    _private_attrs = set()
+    
+    def __setattr__(self, name, value):
+        if name in self._private_attrs:
+            object.__setattr__(self, name, value)
+        else:
+            super().__setattr__(name, value)
+```
