@@ -318,7 +318,7 @@ class Director:
 **实例间共享状态的单例**
 
 > 以下代码来源于[Github-faif/python-patterns](https://github.com/faif/python-patterns/blob/master/patterns/creational/borg.py)
-> 
+
 ```python
 """
 *What is this pattern about?
@@ -601,3 +601,269 @@ class SelectiveBorg(Borg):
         else:
             super().__setattr__(name, value)
 ```
+
+## lazy_evaluation
+
+**Python 中的惰性求值属性模式**
+
+> 以下代码来源于[Github-faif/python-patterns](https://github.com/faif/python-patterns/blob/master/patterns/creational/lazy_evaluation.py)
+
+```python
+"""
+Lazily-evaluated property pattern in Python.
+
+https://en.wikipedia.org/wiki/Lazy_evaluation
+
+*References:
+bottle
+https://github.com/bottlepy/bottle/blob/cafc15419cbb4a6cb748e6ecdccf92893bb25ce5/bottle.py#L270
+django
+https://github.com/django/django/blob/ffd18732f3ee9e6f0374aff9ccf350d85187fac2/django/utils/functional.py#L19
+pip
+https://github.com/pypa/pip/blob/cb75cca785629e15efb46c35903827b3eae13481/pip/utils/__init__.py#L821
+pyramid
+https://github.com/Pylons/pyramid/blob/7909e9503cdfc6f6e84d2c7ace1d3c03ca1d8b73/pyramid/decorator.py#L4
+werkzeug
+https://github.com/pallets/werkzeug/blob/5a2bf35441006d832ab1ed5a31963cbc366c99ac/werkzeug/utils.py#L35
+
+*TL;DR
+Delays the eval of an expr until its value is needed and avoids repeated evals.
+"""
+
+import functools
+
+
+class lazy_property:
+    def __init__(self, function):
+        self.function = function
+        functools.update_wrapper(self, function)
+
+    def __get__(self, obj, type_):
+        if obj is None:
+            return self
+        val = self.function(obj)
+        obj.__dict__[self.function.__name__] = val
+        return val
+
+
+def lazy_property2(fn):
+    """
+    A lazy property decorator.
+
+    The function decorated is called the first time to retrieve the result and
+    then that calculated result is used the next time you access the value.
+    """
+    attr = "_lazy__" + fn.__name__
+
+    @property
+    def _lazy_property(self):
+        if not hasattr(self, attr):
+            setattr(self, attr, fn(self))
+        return getattr(self, attr)
+
+    return _lazy_property
+
+
+class Person:
+    def __init__(self, name, occupation):
+        self.name = name
+        self.occupation = occupation
+        self.call_count2 = 0
+
+    @lazy_property
+    def relatives(self):
+        # Get all relatives, let's assume that it costs much time.
+        relatives = "Many relatives."
+        return relatives
+
+    @lazy_property2
+    def parents(self):
+        self.call_count2 += 1
+        return "Father and mother"
+
+
+def main():
+    """
+    >>> Jhon = Person('Jhon', 'Coder')
+
+    >>> Jhon.name
+    'Jhon'
+    >>> Jhon.occupation
+    'Coder'
+
+    # Before we access `relatives`
+    >>> sorted(Jhon.__dict__.items())
+    [('call_count2', 0), ('name', 'Jhon'), ('occupation', 'Coder')]
+
+    >>> Jhon.relatives
+    'Many relatives.'
+
+    # After we've accessed `relatives`
+    >>> sorted(Jhon.__dict__.items())
+    [('call_count2', 0), ..., ('relatives', 'Many relatives.')]
+
+    >>> Jhon.parents
+    'Father and mother'
+
+    >>> sorted(Jhon.__dict__.items())
+    [('_lazy__parents', 'Father and mother'), ('call_count2', 1), ..., ('relatives', 'Many relatives.')]
+
+    >>> Jhon.parents
+    'Father and mother'
+
+    >>> Jhon.call_count2
+    1
+    """
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod(optionflags=doctest.ELLIPSIS)
+```
+
+详细分析 Python 中实现惰性求值属性的两种方法，这是提高程序性能的重要模式。
+
+### 惰性求值核心概念
+
+惰性求值（Lazy Evaluation）具有以下特点：
+- 延迟计算：只在第一次访问时计算值
+- 缓存结果：后续访问直接返回缓存值
+- 性能优化：避免重复计算开销大的属性
+
+### 两种实现方式对比
+
+#### 1. 描述符实现 (lazy_property)
+```python
+class lazy_property:
+    def __init__(self, function):
+        self.function = function  # 存储原始函数
+        functools.update_wrapper(self, function)  # 保留原函数属性
+
+    def __get__(self, obj, type_):
+        if obj is None:
+            return self
+        val = self.function(obj)  # 首次访问时计算
+        obj.__dict__[self.function.__name__] = val  # 缓存到实例字典
+        return val
+```
+
+**实现原理：**
+
+- 利用 Python 的描述符协议（`__get__` 方法）
+- 当属性被访问时触发计算
+- 计算结果存储在实例的 `__dict__` 中，替代描述符
+
+**特点：**
+
+计算结果存储在属性同名键下（如 `relatives`）
+计算后描述符被替换为普通属性
+不可重新计算（除非手动删除属性）
+
+#### 2. 装饰器+property实现 (lazy_property2)
+
+```python
+def lazy_property2(fn):
+    attr = "_lazy__" + fn.__name__  # 生成私有属性名
+
+    @property
+    def _lazy_property(self):
+        if not hasattr(self, attr):
+            setattr(self, attr, fn(self))  # 计算并缓存
+        return getattr(self, attr)
+
+    return _lazy_property
+```
+
+**实现原理：**
+
+- 使用 @property 装饰器创建属性
+- 采用命名约定 (_lazy__name) 存储缓存值
+- 每次访问都经过 getter 方法检查
+
+**特点：**
+
+- 缓存值存储在带前缀的属性中
+- 维持 property 的特性
+- 更易于识别惰性属性
+
+### 关键差异分析
+
+| 特性                | `lazy_property`              | `lazy_property2`             |
+|---------------------|-----------------------------|------------------------------|
+| **实现机制**         | 描述符协议                  | Property + 闭包              |
+| **存储位置**         | 同名属性                   | 带 `_lazy__` 前缀的属性       |
+| **后续访问路径**      | 直接访问实例字典           | 仍然经过 getter 方法         |
+| **重新计算能力**      | 需要手动删除属性           | 可修改 getter 逻辑实现       |
+| **代码复杂度**        | 较低                       | 略高                        |
+
+### 实际应用场景
+
+1. 数据库连接管理：
+```python
+class DatabaseWrapper:
+    @lazy_property
+    def connection(self):
+        print("Establishing database connection...")
+        return create_engine(DB_URL)
+```
+2. 复杂计算属性：
+```python
+class Statistics:
+    @lazy_property2
+    def regression_coefficients(self):
+        # 耗时的统计计算
+        return self._calculate_regression()
+```
+3. 大型资源加载：
+```python
+class ImageProcessor:
+    @lazy_property
+    def high_res_image(self):
+        print("Loading high-res image...")
+        return load_image(self.path)
+```
+
+### 进阶用法与注意事项(Deepseek输出)
+
+**线程安全改进**
+
+基本实现不是线程安全的，可通过锁机制增强：
+
+```python
+from threading import Lock
+
+class ThreadSafeLazyProperty:
+    def __init__(self, func):
+        self.func = func
+        self.lock = Lock()
+    
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        with self.lock:
+            if self.func.__name__ not in instance.__dict__:
+                instance.__dict__[self.func.__name__] = self.func(instance)
+        return instance.__dict__[self.func.__name__]
+```
+
+**属性验证**
+
+```python
+class ValidatingLazyProperty(lazy_property):
+    def __get__(self, obj, owner):
+        val = super().__get__(obj, owner)
+        if not self.validate(val):
+            raise ValueError("Invalid property value")
+        return val
+```
+
+### 最佳实践建议
+
+1. 明确命名：使用 lazy_ 前缀或注释标明惰性属性
+2. 线程安全：在多线程环境下使用加锁版本
+3. 文档说明：注明属性的计算代价
+4. 避免副作用：惰性属性应该是幂等的
+5. 考虑内存：大对象缓存需谨慎，可添加清理机制
+
+此模式广泛应用于 Django、SQLAlchemy 等大型框架，是优化 Python 程序性能的有效手段。
