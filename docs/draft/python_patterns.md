@@ -868,6 +868,292 @@ class ValidatingLazyProperty(lazy_property):
 
 此模式广泛应用于 Django、SQLAlchemy 等大型框架，是优化 Python 程序性能的有效手段。
 
+## prototype
+
+**使用工厂和原型的克隆来创建新实例（如果实例化成本高昂）**
+
+> 以下代码来源于[Github-faif/python-patterns](https://github.com/faif/python-patterns/blob/master/patterns/creational/prototype.py)
+
+```python
+"""
+*What is this pattern about?
+This patterns aims to reduce the number of classes required by an
+application. Instead of relying on subclasses it creates objects by
+copying a prototypical instance at run-time.
+
+This is useful as it makes it easier to derive new kinds of objects,
+when instances of the class have only a few different combinations of
+state, and when instantiation is expensive.
+
+*What does this example do?
+When the number of prototypes in an application can vary, it can be
+useful to keep a Dispatcher (aka, Registry or Manager). This allows
+clients to query the Dispatcher for a prototype before cloning a new
+instance.
+
+Below provides an example of such Dispatcher, which contains three
+copies of the prototype: 'default', 'objecta' and 'objectb'.
+
+*TL;DR
+Creates new object instances by cloning prototype.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+
+class Prototype:
+    def __init__(self, value: str = "default", **attrs: Any) -> None:
+        self.value = value
+        self.__dict__.update(attrs)
+
+    def clone(self, **attrs: Any) -> Prototype:
+        """Clone a prototype and update inner attributes dictionary"""
+        # Python in Practice, Mark Summerfield
+        # copy.deepcopy can be used instead of next line.
+        obj = self.__class__(**self.__dict__)
+        obj.__dict__.update(attrs)
+        return obj
+
+
+class PrototypeDispatcher:
+    def __init__(self):
+        self._objects = {}
+
+    def get_objects(self) -> dict[str, Prototype]:
+        """Get all objects"""
+        return self._objects
+
+    def register_object(self, name: str, obj: Prototype) -> None:
+        """Register an object"""
+        self._objects[name] = obj
+
+    def unregister_object(self, name: str) -> None:
+        """Unregister an object"""
+        del self._objects[name]
+
+
+def main() -> None:
+    """
+    >>> dispatcher = PrototypeDispatcher()
+    >>> prototype = Prototype()
+
+    >>> d = prototype.clone()
+    >>> a = prototype.clone(value='a-value', category='a')
+    >>> b = a.clone(value='b-value', is_checked=True)
+    >>> dispatcher.register_object('objecta', a)
+    >>> dispatcher.register_object('objectb', b)
+    >>> dispatcher.register_object('default', d)
+
+    >>> [{n: p.value} for n, p in dispatcher.get_objects().items()]
+    [{'objecta': 'a-value'}, {'objectb': 'b-value'}, {'default': 'default'}]
+
+    >>> print(b.category, b.is_checked)
+    a True
+    """
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
+```
+
+原型模式是一种创建型设计模式，它通过复制现有对象来创建新对象，而不是通过实例化类。下面将详细分析这个Python实现。
+
+### 模式核心思想
+
+原型模式主要解决以下问题：
+
+- **减少子类数量**：避免为每种对象组合创建子类
+- **降低实例化成本**：绕过昂贵的构造函数调用
+- **动态配置对象**：运行时修改对象属性
+- **简化对象创建**：通过克隆已有对象生成新对象
+
+### 代码实现解析
+
+**1.  原型基础类**
+
+```python
+class Prototype:
+    def __init__(self, value: str = "default", **attrs: Any) -> None:
+        self.value = value
+        self.__dict__.update(attrs)  # 动态添加属性
+
+    def clone(self, **attrs: Any) -> Prototype:
+        obj = self.__class__(**self.__dict__)  # 创建同类新对象
+        obj.__dict__.update(attrs)  # 更新新对象的属性
+        return obj
+```
+
+**关键技术点：**
+
+- `**attrs`接收任意关键字参数，提供灵活的属性设置
+- `__dict__.update()`动态添加/修改对象属性
+- `self.__class__`确保创建正确类型的对象
+- 浅拷贝 vs 深拷贝的选择（本例使用浅拷贝）
+
+**2. 原型管理器**
+
+```python
+class PrototypeDispatcher:
+    def __init__(self):
+        self._objects = {}  # 存储原型注册表
+
+    def register_object(self, name: str, obj: Prototype) -> None:
+        self._objects[name] = obj  # 注册原型
+
+    def unregister_object(self, name: str) -> None:
+        del self._objects[name]  # 取消注册
+
+    def get_objects(self) -> dict[str, Prototype]:
+        return self._objects  # 获取所有原型
+```
+
+**设计优势：**
+
+- 集中管理多个原型实例
+- 提供命名访问接口
+- 可扩展添加原型搜索/过滤功能
+
+**3. 克隆过程分析**
+
+```python
+prototype = Prototype()
+a = prototype.clone(value='a-value', category='a')  # 克隆并修改
+b = a.clone(value='b-value', is_checked=True)  # 基于a再次克隆
+```
+
+克隆链关系：
+
+```text
+prototype (value='default') 
+    → a (value='a-value', category='a') 
+        → b (value='b-value', category='a', is_checked=True)
+```
+
+### 深拷贝与浅拷贝选择
+
+当前实现（浅拷贝）：
+```python
+obj = self.__class__(**self.__dict__)
+```
+
+替代方案（深拷贝）：
+```python
+import copy
+obj = copy.deepcopy(self)
+```
+
+选择依据：
+- 浅拷贝更适合：当对象只包含基本数据类型或需要共享引用时
+- 深拷贝更适合：当对象包含嵌套可变数据结构需要完全独立时
+
+### 实际应用场景
+
+**1. 游戏开发**
+```python
+class Enemy(Prototype):
+    def __init__(self, health, speed):
+        super().__init__(health=health, speed=speed)
+        
+# 创建基础敌人原型
+goblin = Enemy(health=100, speed=1.0)
+# 克隆生成变种
+archer_goblin = goblin.clone(speed=1.2, attack_range=5)
+```
+
+**2. UI组件库**
+```python
+button_proto = Prototype(
+    width=100, 
+    height=50, 
+    color="blue",
+    onclick=None
+)
+
+primary_button = button_proto.clone(
+    color="green", 
+    style="primary"
+)
+```
+
+**3. 文档处理**
+```python
+class Document(Prototype):
+    pass
+
+template = Document(
+    format="A4", 
+    margin=2.54, 
+    font="Times New Roman"
+)
+
+report = template.clone(
+    title="Annual Report",
+    header="Company Logo"
+)
+```
+
+### 模式变体与进阶实现
+
+**1. 带克隆钩子的原型**
+
+```python
+class HookedPrototype(Prototype):
+    def clone(self, **attrs):
+        obj = super().clone(**attrs)
+        self._post_clone(obj)  # 后处理钩子
+        return obj
+        
+    def _post_clone(self, clone):
+        """子类可重写的克隆后处理"""
+        pass
+```
+
+**2. 原型注册表扩展**
+
+```python
+class AdvancedDispatcher(PrototypeDispatcher):
+    def clone_by_name(self, name, **attrs):
+        """按名称克隆并更新属性"""
+        prototype = self._objects.get(name)
+        if not prototype:
+            raise ValueError(f"No prototype named '{name}'")
+        return prototype.clone(**attrs)
+```
+
+**3. 原型版本控制**
+
+```python
+class VersionedPrototype(Prototype):
+    _version = 0
+    
+    def clone(self, **attrs):
+        obj = super().clone(**attrs)
+        obj._version += 1
+        return obj
+```
+
+### 性能优化技巧
+
+1. 原型缓存：缓存频繁使用的原型组合
+2. 惰性初始化：延迟昂贵属性的计算
+3. 差异化复制：只复制修改的部分
+4. 批量克隆：实现多对象同时克隆
+
+### 与其他创建型模式对比
+
+| 模式          | 特点                            | 适用场景                      |
+|--------------|-------------------------------|-----------------------------|
+| **原型模式**   | 通过克隆创建对象                   | 当对象创建成本高或配置复杂时       |
+| **工厂模式**   | 通过工厂方法创建相关对象             | 需要明确控制创建逻辑时           |
+| **建造者模式** | 分步骤构建复杂对象                 | 对象有多部分且构建过程复杂时       |
+| **单例模式**   | 确保类只有一个实例                 | 需要全局唯一访问点时             |
+
+原型模式特别适合需要高度灵活性和运行时配置的场景，它的Python实现充分利用了动态语言的特性，提供了简洁而强大的对象复制机制。
+
 ## pool
 
 **预先实例化并维护一组相同类型的实例**
