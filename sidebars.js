@@ -67,6 +67,13 @@ const sidebars = {
           type: 'category',
           label: 'Odoo原生解析',
           items: [
+            {
+                type: 'category',
+                label: 'Fields',
+                items: [
+                    'odoo/dev_notes/source_code_analysis/fields/binary_field_analysis',
+                ]
+            },
             'odoo/dev_notes/check_credentials',
             'odoo/dev_notes/xml_rpc',
             'odoo/dev_notes/owl_dialog',
@@ -74,8 +81,7 @@ const sidebars = {
             'odoo/dev_notes/owl_dropdown',
             'odoo/dev_notes/owl_useSortable',            
             'odoo/dev_notes/command_palette',
-            'odoo/dev_notes/file_viewer_v17',
-            'odoo/dev_notes/source_code_analysis/binary_field_analysis',
+            'odoo/dev_notes/file_viewer_v17',            
           ]
         },
         {
