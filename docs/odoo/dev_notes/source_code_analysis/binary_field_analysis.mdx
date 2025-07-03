@@ -1,0 +1,276 @@
+---
+title: BinaryField解析(Odoo16)
+description: BinaryField解析(Odoo16)
+sidebar_label: BinaryField解析(Odoo16)
+keyword:
+    - odoo
+    - odoo development
+tags: [odoo]
+last_update:
+  date: 2025/7/3
+  author: Lucas
+---
+
+# BinaryField解析(Odoo16)
+
+
+
+<details>
+    <summary>BinaryField</summary>
+
+    <Tabs groupId="source-code">
+        <TabItem value="binary_field.js" label="binary_field.js" default>
+            
+```javascript
+/** @odoo-module **/
+
+import { registry } from "@web/core/registry";
+import { useService } from "@web/core/utils/hooks";
+import { isBinarySize, toBase64Length } from "@web/core/utils/binary";
+import { download } from "@web/core/network/download";
+import { standardFieldProps } from "../standard_field_props";
+import { FileUploader } from "../file_handler";
+import { _lt } from "@web/core/l10n/translation";
+
+import { Component, onWillUpdateProps, useState } from "@odoo/owl";
+
+export const MAX_FILENAME_SIZE_BYTES = 0xFF;  // filenames do not exceed 255 bytes on Linux/Windows/MacOS
+
+export class BinaryField extends Component {
+    setup() {
+        this.notification = useService("notification");
+        this.state = useState({
+            fileName: this.props.record.data[this.props.fileNameField] || "",
+        });
+        onWillUpdateProps((nextProps) => {
+            this.state.fileName = nextProps.record.data[nextProps.fileNameField] || "";
+        });
+    }
+
+    get fileName() {
+        return (this.state.fileName || this.props.value || "").slice(0, toBase64Length(MAX_FILENAME_SIZE_BYTES));
+    }
+
+    update({ data, name }) {
+        this.state.fileName = name || "";
+        const { fileNameField, record } = this.props;
+        const changes = { [this.props.name]: data || false };
+        if (fileNameField in record.fields && record.data[fileNameField] !== name) {
+            changes[fileNameField] = name || false;
+        }
+        return this.props.record.update(changes);
+    }
+
+    async onFileDownload() {
+        await download({
+            data: {
+                model: this.props.record.resModel,
+                id: this.props.record.resId,
+                field: this.props.name,
+                filename_field: this.fileName,
+                filename: this.fileName || "",
+                download: true,
+                data: isBinarySize(this.props.value) ? null : this.props.value,
+            },
+            url: "/web/content",
+        });
+    }
+}
+
+BinaryField.template = "web.BinaryField";
+BinaryField.components = {
+    FileUploader,
+};
+BinaryField.props = {
+    ...standardFieldProps,
+    acceptedFileExtensions: { type: String, optional: true },
+    fileNameField: { type: String, optional: true },
+};
+BinaryField.defaultProps = {
+    acceptedFileExtensions: "*",
+};
+
+BinaryField.displayName = _lt("File");
+BinaryField.supportedTypes = ["binary"];
+
+BinaryField.extractProps = ({ attrs }) => {
+    return {
+        acceptedFileExtensions: attrs.options.accepted_file_extensions,
+        fileNameField: attrs.filename,
+    };
+};
+
+registry.category("fields").add("binary", BinaryField);
+
+```
+
+        </TabItem>
+        <TabItem value="binary_field.xml" label="binary_field.xml">
+            
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="web.BinaryField" owl="1">
+        <t t-if="!props.readonly">
+            <t t-if="props.value">
+                <div class="w-100 d-inline-flex">
+                    <FileUploader
+                        acceptedFileExtensions="props.acceptedFileExtensions"
+                        file="{ data: props.value, name: fileName }"
+                        onUploaded.bind="update"
+                    >
+                        <t t-if="props.record.resId and !props.record.isDirty">
+                            <button
+                                class="btn btn-secondary fa fa-download"
+                                data-tooltip="Download"
+                                aria-label="Download"
+                                t-on-click="onFileDownload"
+                            />
+                        </t>
+                        <t t-set-slot="toggler">
+                            <input type="text" class="o_input" t-att-value="fileName" readonly="readonly" />
+                            <button
+                                class="btn btn-secondary fa fa-pencil o_select_file_button"
+                                data-tooltip="Edit"
+                                aria-label="Edit"
+                            />
+                        </t>
+                        <button
+                            class="btn btn-secondary fa fa-trash o_clear_file_button"
+                            data-tooltip="Clear"
+                            aria-label="Clear"
+                            t-on-click="() => this.update({})"
+                        />
+                    </FileUploader>
+                </div>
+            </t>
+            <t t-else="">
+                <label class="o_select_file_button btn btn-primary">
+                    <FileUploader
+                        acceptedFileExtensions="props.acceptedFileExtensions"
+                        onUploaded.bind="update"
+                    >
+                        <t t-set-slot="toggler">
+                            Upload your file
+                        </t>
+                    </FileUploader>
+                </label>
+            </t>
+        </t>
+        <t t-elif="props.record.resId and props.value">
+            <a class="o_form_uri" href="#" t-on-click.prevent="onFileDownload">
+                <span class="fa fa-download me-2" />
+                <t t-if="state.fileName" t-esc="state.fileName" />
+            </a>
+        </t>
+    </t>
+
+</templates>
+
+```
+
+        </TabItem>
+    </Tabs>
+
+</details>
+
+## BinaryField Component
+
+### Function
+
+- `setup()`
+
+初始化组件状态和服务。
+
+- `get fileName()`
+
+计算属性：获取截断后的文件名字符串（使用 `toBase64Length` 进行长度转换，最大字节数：`MAX_FILENAME_SIZE_BYTES = 0xFF`: 允许的最大文件名大小为255字节）
+
+- `update({data, name})`
+
+**处理文件更新。** 如果fileNameField在record.fields中且有变更，则一并更新文件名字段。
+
+入参：
+- `data`: 文件内容
+- `name`: 文件名
+
+- `onFileDownload()`
+
+**处理文件下载。** 
+
+使用`download`服务发起下载请求。（路由：`/web/content`）
+
+### 组件属性
+
+- **template:**
+
+模板的xml_id: `"web.BinaryField"`
+
+- **components:**
+
+`FileUploader`: 
+
+- **props:**
+
+`...standardFieldProps`: 标准字段props
+
+`acceptedFileExtensions`: 支持的文件类型/扩展名( default: "*" )。通过`<field/>`标签内的`options.accepted_file_extensions`设置。
+
+`fileNameField`: 存储文件名的`field`字段名。通过`<field/>`标签内的`filename`属性设置。
+
+- **supportedTypes**
+
+支持的字段类型: `binary`
+
+### registry
+
+将组件注册到`fields`中，field_widget name: `binary`。
+
+## BinaryField template
+
+### 模板结构
+
+1. 可编辑模式(非只读时):
+
+    - 当有值时: (Component: `FileUploader`)
+        - 显示下载按钮(如果记录存在且不处于修改后未保存状态): `t-on-click=onFileDownload`
+        - `<slot: 'toggler'>` 在只读输入框中显示文件名, 编辑(铅笔)按钮
+        - 清除(垃圾桶)按钮: `t-on-click="() => this.update({})"`
+
+    - 当无值时: (Component: `FileUploader`)
+        - `<slot: 'toggler'>` 显示带有"上传文件"标签的上传按钮
+
+2. 只读模式:
+    - 显示带文件名的下载链接(如果记录存在且有值): `t-on-click.prevent="onFileDownload"`
+
+> .prevent 用于阻止事件的默认行为，等同于 event.preventDefault()。
+
+## 核心逻辑
+
+### 文件处理
+
+- 上传: 通过核心上传组件`FileUploader`处理。
+- 下载: 使用带适当参数的Odoo `/web/content`端点
+- 更新: 原子性地处理文件内容和文件名更新
+- 清除: 允许移除当前文件
+
+### 状态管理
+
+- 使用Owl的`useState`独立跟踪文件名
+- 通过`onWillUpdateProps`在属性变更时更新文件名
+
+### 安全考虑
+
+- 文件名截断至255字节以防止文件系统问题
+- 通过Odoo的二进制工具正确处理二进制数据
+
+## 扩展建议
+
+保证原有核心处理：**上传、下载、更新、清除**。
+
+在上述基础上可对一些用户操作进行优化。
+
+例如：
+- **上传**：拖拽文件上传、从剪贴板复制、从URL上传、从网盘上传等等。
+- **文件上传前的处理**：图片上传可以支持再编辑（裁剪等）。
