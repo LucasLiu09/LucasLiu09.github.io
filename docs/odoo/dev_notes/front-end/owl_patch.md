@@ -195,7 +195,7 @@ patch(MyComponent.prototype, "my patch", {
 
 **`unpatch(obj, patchName)`**
 
-:::into[参数]
+:::info[参数]
 - obj (Object()) – 取消取消patch的对象
 - patchName (string()) – 描述应删除的补丁的字符串
 :::
