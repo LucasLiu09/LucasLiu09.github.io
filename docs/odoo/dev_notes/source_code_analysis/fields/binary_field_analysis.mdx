@@ -15,8 +15,6 @@ import TabItem from '@theme/TabItem';
 
 # BinaryField解析(Odoo16)
 
-
-
 <details>
     <summary>BinaryField</summary>
 
@@ -177,53 +175,53 @@ registry.category("fields").add("binary", BinaryField);
 
 </details>
 
+---
+
 ## BinaryField Component
 
 ### Function
 
 - `setup()`
 
-初始化组件状态和服务。
+    初始化组件状态和服务。
 
 - `get fileName()`
 
-计算属性：获取截断后的文件名字符串（使用 `toBase64Length` 进行长度转换，最大字节数：`MAX_FILENAME_SIZE_BYTES = 0xFF`: 允许的最大文件名大小为255字节）
+    计算属性：获取截断后的文件名字符串（使用 `toBase64Length` 进行长度转换，最大字节数：`MAX_FILENAME_SIZE_BYTES = 0xFF`: 允许的最大文件名大小为255字节）
 
 - `update({data, name})`
 
-**处理文件更新。** 如果fileNameField在record.fields中且有变更，则一并更新文件名字段。
-
-入参：
-- `data`: 文件内容
-- `name`: 文件名
+    **处理文件更新。** 如果fileNameField在record.fields中且有变更，则一并更新文件名字段。
+    
+    入参：
+    - `data`: 文件内容
+    - `name`: 文件名
 
 - `onFileDownload()`
 
-**处理文件下载。** 
-
-使用`download`服务发起下载请求。（路由：`/web/content`）
+    **处理文件下载。** 使用`download`服务发起下载请求。（路由：`/web/content`）
 
 ### 组件属性
 
 - **template:**
 
-模板的xml_id: `"web.BinaryField"`
+    模板的xml_id: `"web.BinaryField"`
 
 - **components:**
 
-`FileUploader`: 
+    `FileUploader`: (待补充)
 
 - **props:**
 
-`...standardFieldProps`: 标准字段props
-
-`acceptedFileExtensions`: 支持的文件类型/扩展名( default: "*" )。通过`<field/>`标签内的`options.accepted_file_extensions`设置。
-
-`fileNameField`: 存储文件名的`field`字段名。通过`<field/>`标签内的`filename`属性设置。
+    `...standardFieldProps`: 标准字段props
+    
+    `acceptedFileExtensions`: 支持的文件类型/扩展名( default: "*" )。通过`<field/>`标签内的`options.accepted_file_extensions`设置。
+    
+    `fileNameField`: 存储文件名的`field`字段名。通过`<field/>`标签内的`filename`属性设置。
 
 - **supportedTypes**
 
-支持的字段类型: `binary`
+    支持的字段类型: `binary`
 
 ### registry
 
@@ -248,6 +246,8 @@ registry.category("fields").add("binary", BinaryField);
 
 > .prevent 用于阻止事件的默认行为，等同于 event.preventDefault()。
 
+---
+
 ## 核心逻辑
 
 ### 文件处理
@@ -266,6 +266,8 @@ registry.category("fields").add("binary", BinaryField);
 
 - 文件名截断至255字节以防止文件系统问题
 - 通过Odoo的二进制工具正确处理二进制数据
+
+---
 
 ## 扩展建议
 
