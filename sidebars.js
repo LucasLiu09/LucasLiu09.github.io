@@ -71,6 +71,7 @@ const sidebars = {
                 type: 'category',
                 label: 'Fields',
                 items: [
+                    'odoo/dev_notes/source_code_analysis/fields/file_handler',
                     'odoo/dev_notes/source_code_analysis/fields/binary_field_analysis',
                 ]
             },
