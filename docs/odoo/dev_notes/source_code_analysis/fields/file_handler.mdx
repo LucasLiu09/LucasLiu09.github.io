@@ -1,0 +1,335 @@
+---
+title: FileUploader解析(Odoo16)
+description: FileUploader解析(Odoo16)
+sidebar_label: FileUploader解析(Odoo16)
+keyword:
+    - odoo
+    - odoo development
+tags: [odoo]
+last_update:
+  date: 2025/7/4
+  author: Lucas
+---
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# FileUploader 组件分析
+
+<details>
+    <summary>FileUploader</summary>
+
+    <Tabs groupId="source-code">
+        <TabItem value="file_handler.js" label="file_handler.js" default>
+            
+```javascript
+/** @odoo-module **/
+
+import { useService } from "@web/core/utils/hooks";
+import { checkFileSize } from "@web/core/utils/files";
+import { getDataURLFromFile } from "@web/core/utils/urls";
+
+import { Component, useRef, useState } from "@odoo/owl";
+
+export class FileUploader extends Component {
+    setup() {
+        this.notification = useService("notification");
+        this.fileInputRef = useRef("fileInput");
+        this.state = useState({
+            isUploading: false,
+        });
+    }
+
+    /**
+     * @param {Event} ev
+     */
+    async onFileChange(ev) {
+        if (!ev.target.files.length) {
+            return;
+        }
+        for (const file of ev.target.files) {
+            if (!checkFileSize(file.size, this.notification)) {
+                return null;
+            }
+            this.state.isUploading = true;
+            const data = await getDataURLFromFile(file);
+            if (!file.size) {
+                console.warn(`Error while uploading file : ${file.name}`);
+                this.notification.add(
+                    this.env._t("There was a problem while uploading your file."),
+                    {
+                        type: "danger",
+                    }
+                );
+            }
+            try {
+                await this.props.onUploaded({
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    data: data.split(",")[1],
+                    objectUrl: file.type === "application/pdf" ? URL.createObjectURL(file) : null,
+                });
+            } finally {
+                this.state.isUploading = false;
+            }
+        }
+        if (this.props.multiUpload && this.props.onUploadComplete) {
+            this.props.onUploadComplete({});
+        }
+    }
+
+    onSelectFileButtonClick() {
+        this.fileInputRef.el.click();
+    }
+}
+
+FileUploader.template = "web.FileUploader";
+
+```
+
+        </TabItem>
+        <TabItem value="file_handler.xml" label="file_handler.xml">
+            
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="web.FileUploader" owl="1">
+        <t t-if="state.isUploading">Uploading...</t>
+        <span t-else="" t-on-click.prevent="onSelectFileButtonClick" style="display:contents">
+            <t t-slot="toggler"/>
+        </span>
+        <t t-slot="default"/>
+        <input
+            type="file"
+            t-att-name="props.inputName"
+            t-ref="fileInput"
+            t-attf-class="o_input_file o_hidden {{ props.fileUploadClass or '' }}"
+            t-att-multiple="props.multiUpload ? 'multiple' : false" t-att-accept="props.acceptedFileExtensions or '*'"
+            t-on-change="onFileChange"
+        />
+    </t>
+
+</templates>
+
+```
+
+        </TabItem>
+    </Tabs>
+
+</details>
+
+---
+
+## 1. JavaScript组件文件 (`file_handler.js`)
+
+### 1.1 导入依赖
+
+```javascript
+import { useService } from "@web/core/utils/hooks";
+import { checkFileSize } from "@web/core/utils/files";
+import { getDataURLFromFile } from "@web/core/utils/urls";
+import { Component, useRef, useState } from "@odoo/owl";
+```
+
+**各依赖作用：**
+- `useService`: Odoo的钩子函数，用于访问系统服务
+- `checkFileSize`: 文件大小验证工具函数
+- `getDataURLFromFile`: 将文件转换为DataURL的工具函数
+- `Component, useRef, useState`: OWL框架的核心组件类和钩子
+
+### 1.2 组件类定义
+
+```javascript
+export class FileUploader extends Component {
+```
+
+**作用：** 定义了一个名为`FileUploader`的可复用文件上传组件。
+
+### 1.3 组件初始化 (`setup`)
+
+```javascript
+setup() {
+    this.notification = useService("notification");
+    this.fileInputRef = useRef("fileInput");
+    this.state = useState({
+        isUploading: false,
+    });
+}
+```
+
+**各部分功能：**
+- `this.notification`: 获取通知服务，用于显示用户提示信息
+- `this.fileInputRef`: 创建对隐藏文件输入框的引用
+- `this.state`: 管理组件状态，包含上传状态标识
+
+### 1.4 文件变更处理 (`onFileChange`)
+
+```javascript
+async onFileChange(ev) {
+    if (!ev.target.files.length) {
+        return;
+    }
+    for (const file of ev.target.files) {
+        if (!checkFileSize(file.size, this.notification)) {
+            return null;
+        }
+        this.state.isUploading = true;
+        const data = await getDataURLFromFile(file);
+        if (!file.size) {
+            console.warn(`Error while uploading file : ${file.name}`);
+            this.notification.add(
+                this.env._t("There was a problem while uploading your file."),
+                {
+                    type: "danger",
+                }
+            );
+        }
+        try {
+            await this.props.onUploaded({
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                data: data.split(",")[1],
+                objectUrl: file.type === "application/pdf" ? URL.createObjectURL(file) : null,
+            });
+        } finally {
+            this.state.isUploading = false;
+        }
+    }
+    if (this.props.multiUpload && this.props.onUploadComplete) {
+        this.props.onUploadComplete({});
+    }
+}
+```
+
+**功能详解：**
+1. **文件存在性检查**: 验证是否有文件被选中
+2. **文件大小验证**: 使用`checkFileSize`验证文件大小是否符合要求
+3. **状态管理**: 设置`isUploading`为true，显示上传状态
+4. **文件处理**: 
+   - 将文件转换为DataURL格式
+   - 提取base64数据（去除data:前缀）
+   - 对PDF文件创建ObjectURL用于预览
+5. **错误处理**: 捕获并显示文件上传错误
+6. **回调执行**: 调用父组件传入的`onUploaded`回调
+7. **多文件上传**: 支持批量上传完成的回调
+
+### 1.5 文件选择按钮点击处理
+
+```javascript
+onSelectFileButtonClick() {
+    this.fileInputRef.el.click();
+}
+```
+
+**作用：** 触发隐藏的文件输入框，打开文件选择对话框。
+
+---
+
+## 2. XML模板文件 (`file_handler.xml`)
+
+### 2.1 模板声明
+
+```xml
+<t t-name="web.FileUploader" owl="1">
+```
+
+**作用：** 声明OWL模板，名称为`web.FileUploader`，与JavaScript组件关联。
+
+### 2.2 条件渲染 - 上传状态
+
+```xml
+<t t-if="state.isUploading">Uploading...</t>
+```
+
+**功能：** 当`state.isUploading`为true时显示"Uploading..."文本，提供上传进度反馈。
+
+### 2.3 主要交互区域
+
+```xml
+<span t-else="" t-on-click.prevent="onSelectFileButtonClick" style="display:contents">
+    <t t-slot="toggler"/>
+</span>
+```
+
+**功能详解：**
+- `t-else`: 与上面的上传状态形成条件分支
+- `t-on-click.prevent`: 绑定点击事件，阻止默认行为
+- `style="display:contents"`: CSS样式，使span不影响布局
+- `t-slot="toggler"`: 插槽，允许父组件自定义触发按钮的外观
+
+### 2.4 默认内容插槽
+
+```xml
+<t t-slot="default"/>
+```
+
+**作用：** 提供默认内容插槽，允许在组件内部插入自定义内容。
+
+### 2.5 隐藏文件输入框
+
+```xml
+<input
+    type="file"
+    t-att-name="props.inputName"
+    t-ref="fileInput"
+    t-attf-class="o_input_file o_hidden {{ props.fileUploadClass or '' }}"
+    t-att-multiple="props.multiUpload ? 'multiple' : false" 
+    t-att-accept="props.acceptedFileExtensions or '*'"
+    t-on-change="onFileChange"
+/>
+```
+
+**各属性功能：**
+- `type="file"`: 标准HTML文件输入类型
+- `t-att-name`: 动态设置name属性
+- `t-ref="fileInput"`: 模板引用，对应JavaScript中的`fileInputRef`
+- `t-attf-class`: 动态CSS类名，包含隐藏样式和可选的自定义类
+- `t-att-multiple`: 根据props控制是否支持多文件选择
+- `t-att-accept`: 设置接受的文件类型，默认为所有类型
+- `t-on-change`: 绑定文件变更事件处理器
+
+---
+
+## 3. 组件使用方式
+
+### 3.1 Props 接口
+
+组件接受以下props：
+- `inputName`: 输入框的name属性
+- `multiUpload`: 是否支持多文件上传
+- `acceptedFileExtensions`: 接受的文件扩展名
+- `fileUploadClass`: 附加的CSS类名
+- `onUploaded`: 文件上传完成回调函数
+- `onUploadComplete`: 批量上传完成回调函数
+
+### 3.2 插槽使用
+
+- `toggler`: 自定义触发按钮的外观
+- `default`: 插入额外的内容
+
+### 3.3 典型使用场景
+
+```xml
+<FileUploader 
+    multiUpload="true"
+    acceptedFileExtensions="'.pdf,.doc,.docx'"
+    onUploaded="handleFileUpload">
+    <t t-set-slot="toggler">
+        <button class="btn btn-primary">选择文件</button>
+    </t>
+</FileUploader>
+```
+
+---
+
+## 4. 设计特点
+
+1. **用户体验**: 提供上传状态反馈，错误处理完善
+2. **可扩展性**: 通过插槽机制支持UI自定义
+3. **功能完整**: 支持单文件和多文件上传
+4. **安全性**: 内置文件大小验证
+5. **兼容性**: 支持PDF文件预览URL生成
+
+这个组件是Odoo Web框架中处理文件上传的核心组件，提供了完整的文件上传解决方案。
