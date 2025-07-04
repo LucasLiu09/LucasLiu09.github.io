@@ -7,7 +7,7 @@ keyword:
     - odoo development
 tags: [odoo]
 last_update:
-  date: 2025/7/3
+  date: 2025/7/4
   author: Lucas
 ---
 import Tabs from '@theme/Tabs';
@@ -177,6 +177,18 @@ registry.category("fields").add("binary", BinaryField);
 
 ---
 
+## 导入依赖
+
+**各依赖作用：**
+- `registry`: Odoo注册表，用于注册组件
+- `useService`: 获取系统服务的钩子
+- `isBinarySize, toBase64Length`: 二进制数据处理工具
+- `download`: 文件下载功能
+- `standardFieldProps`: 标准字段属性定义
+- `FileUploader`: 文件上传组件
+- `_lt`: 国际化翻译函数
+- `Component, onWillUpdateProps, useState`: OWL框架核心组件和钩子
+
 ## BinaryField Component
 
 ### Function
@@ -185,17 +197,28 @@ registry.category("fields").add("binary", BinaryField);
 
     初始化组件状态和服务。
 
+    **各部分功能：**
+    - `this.notification`: 获取通知服务
+    - `this.state`: 管理组件状态，包含文件名
+    - `onWillUpdateProps`: 监听props变化，同步更新文件名状态
+
 - `get fileName()`
 
-    计算属性：获取截断后的文件名字符串（使用 `toBase64Length` 进行长度转换，最大字节数：`MAX_FILENAME_SIZE_BYTES = 0xFF`: 允许的最大文件名大小为255字节）
+    计算属性：获取截断后的文件名字符串（使用`toBase64Length`转换确保base64编码后的长度符合要求，最大字节数：`MAX_FILENAME_SIZE_BYTES = 0xFF`: 允许的最大文件名大小为255字节，兼容主流操作系统。）
 
 - `update({data, name})`
 
-    **处理文件更新。** 如果fileNameField在record.fields中且有变更，则一并更新文件名字段。
-    
-    入参：
+    参数：
     - `data`: 文件内容
     - `name`: 文件名
+
+    **处理文件更新。功能详解** 
+    1. **状态更新**: 更新本地文件名状态
+    2. **数据准备**: 构建要更新的数据对象
+    3. **字段检查**: 检查文件名字段是否存在且需要更新
+    4. **记录更新**: 调用记录的update方法提交变更
+    
+    
 
 - `onFileDownload()`
 
@@ -209,7 +232,7 @@ registry.category("fields").add("binary", BinaryField);
 
 - **components:**
 
-    `FileUploader`: (待补充)
+    `FileUploader`: 详情见[FileUploader组件分析](file_handler.mdx)。
 
 - **props:**
 
@@ -234,8 +257,8 @@ registry.category("fields").add("binary", BinaryField);
 1. 可编辑模式(非只读时):
 
     - 当有值时: (Component: `FileUploader`)
-        - 显示下载按钮(如果记录存在且不处于修改后未保存状态): `t-on-click=onFileDownload`
-        - `<slot: 'toggler'>` 在只读输入框中显示文件名, 编辑(铅笔)按钮
+        - 显示下载按钮(记录已保存且未修改时显示): `t-on-click=onFileDownload`
+        - 在只读输入框中显示文件名, 编辑(铅笔)按钮，`<slot: 'toggler'>`作为FileUploader的toggler插槽内容
         - 清除(垃圾桶)按钮: `t-on-click="() => this.update({})"`
 
     - 当无值时: (Component: `FileUploader`)
@@ -264,8 +287,35 @@ registry.category("fields").add("binary", BinaryField);
 
 ### 安全考虑
 
-- 文件名截断至255字节以防止文件系统问题
-- 通过Odoo的二进制工具正确处理二进制数据
+- **数据验证**: 文件大小和类型限制, 文件名长度截断至255字节以防止文件系统问题
+- **权限控制**: 只读模式下禁用编辑功能
+- **数据处理**: 安全的base64编码处理，通过Odoo的二进制工具正确处理二进制数据
+
+## 组件交互流程
+
+### 文件上传流程
+
+1. **用户点击**: 点击上传按钮或编辑按钮
+2. **文件选择**: 打开文件选择对话框
+3. **文件验证**: FileUploader验证文件大小和类型
+4. **数据处理**: 转换文件为base64格式
+5. **回调执行**: 调用BinaryField的update方法
+6. **状态更新**: 更新文件名和数据
+7. **界面刷新**: 重新渲染显示新文件
+
+### 文件下载流程
+
+1. **用户点击**: 点击下载按钮或文件名链接
+2. **参数构建**: 构建下载请求参数
+3. **服务调用**: 调用下载服务
+4. **文件传输**: 浏览器开始下载文件
+
+### 文件清除流程
+
+1. **用户点击**: 点击清除按钮
+2. **数据清空**: 调用update方法传入空对象
+3. **状态重置**: 清空文件名和数据
+4. **界面更新**: 切换到无文件状态
 
 ---
 
