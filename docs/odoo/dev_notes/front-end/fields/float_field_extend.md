@@ -16,12 +16,12 @@ last_update:
 :::info[Note]
 对`FloatField`进行一些扩展以实现更多的功能
 
-  1. `FloatFieldFormat`: 数据显示及必填检查
+  1. `FloatFieldFormat`: 格式化数据显示及必填检查
   2. `FloatFieldFormatX`: 自定义整数数据的小数位数(即显示0的位数)（对于小数部分非0的时候，沿用digits处理，当小数部分为0的时候，可以单独设置保留位数。）
 
 :::
 
-## FloatFieldFormat 数据显示及必填检查
+## FloatFieldFormat 格式化数据显示及必填检查
 
 :::info[Note]
 FloatFieldFormat:
@@ -113,7 +113,7 @@ FloatFieldFormat.extractProps = ({ attrs, field }) => {
 registry.category("fields").add('float_format', FloatFieldFormat);
 ```
 
-##  自定义整数数据的小数位数
+## FloatFieldFormatX 自定义整数数据的小数位数
 
 :::info[Note]
 FloatFieldFormatX:
