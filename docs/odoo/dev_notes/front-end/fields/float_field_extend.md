@@ -7,21 +7,29 @@ keyword:
   - odoo development
 tags: [ odoo ]
 last_update:
-  date: 2025/5/28
+  date: 2025/7/7
   author: Lucas
 ---
 
 # Float Field扩展
 
 :::info[Note]
-Float Field扩展:
-- 是否显示0
-- 是否格式化（千分位、小数位保留）
-- 必填是检查是否非0
+对`FloatField`进行一些扩展以实现更多的功能
+
+  1. `FloatFieldFormat`: 数据显示及必填检查
+  2. `FloatFieldFormatX`: 自定义整数数据的小数位数(即显示0的位数)（对于小数部分非0的时候，沿用digits处理，当小数部分为0的时候，可以单独设置保留位数。）
 
 :::
 
-## 数据显示及必填检查
+## FloatFieldFormat 数据显示及必填检查
+
+:::info[Note]
+FloatFieldFormat:
+- 是否显示0(当value=0时，可显示为空白)
+- 是否格式化（是否保留千分位、小数部分尾部多余的0）
+- 必填时检查是否非0
+
+:::
 
 通过分析查找出`addons/web/static/src/views/basic_relational_model.js`以下位置的代码会处理数据的必填校验。
 此处可以看出检查必填时是通过`FieldComponent.isSet`这个function处理。所以只需要做出以下修改(若需求为正数，也可通过修改此处实现)：
@@ -103,4 +111,93 @@ FloatFieldFormat.extractProps = ({ attrs, field }) => {
 };
 
 registry.category("fields").add('float_format', FloatFieldFormat);
+```
+
+##  自定义整数数据的小数位数
+
+:::info[Note]
+FloatFieldFormatX:
+- 自定义整数数据时显示0的位数（对于小数部分非0的时候，沿用digits处理，当小数部分为0的时候，可以单独设置保留位数。）
+- 必填时检查是否非0
+
+:::
+
+```javascript
+/** @odoo-module **/
+import { registry } from "@web/core/registry";
+import { standardFieldProps } from "@web/views/fields/standard_field_props";
+import { FloatField } from "@web/views/fields/float/float_field";
+import { archParseBoolean } from "@web/views/utils";
+import { formatFloat } from "@web/views/fields/formatters";
+
+/**
+ * Usage:
+ * widget="float_format_x" options="{'intShowDecimal': 'true', 'intDecimalDigits': 2}"
+ * 参数:
+ * intShowDecimal: 默认true, 在options中该值是string类型。
+ *   - true: 当数值为整数时，按intDecimalDigits设置小数位，整数位数为digits[0]
+ *   - false: 设置为false时，将以按digits格式化
+ * intDecimalDigits: 当数值为整数时，保留的小数位数，默认0
+ * 
+ * ** 这里没有对数据=0时做空值显示处理，这个widget被当做纯粹的数字格式化widget使用，如果需要处理0值，请使用float_format **
+ */
+
+export class FloatFieldFormatX extends FloatField {
+
+    get formattedValue() {
+        if (this.props.inputType === "number" && !this.props.readonly && this.props.value) {
+            return this.props.value;
+        }
+        
+        if (Number.isInteger(this.props.value)) {
+            // 避免this.props.digits[0]可能出现的问题，做一点额外处理。尽管formatFloat方法中不会对digits[0]做处理，但为了兼容性，还是做一下处理。
+            const d = this.props.digits && Array.isArray(this.props.digits) ? this.props.digits[0] : undefined;
+            return formatFloat(this.props.value, { digits: this.props.intShowDecimal ? [d, this.props.intDecimalDigits] : this.props.digits });
+        }else{
+            return formatFloat(this.props.value, { digits: this.props.digits });
+        }
+    }
+}
+
+// 处理必填时验证数据非0
+FloatFieldFormatX.isSet = (value) => value !== 0;
+FloatFieldFormatX.props = {
+    ...standardFieldProps,
+    inputType: { type: String, optional: true },
+    step: { type: Number, optional: true },
+    digits: { type: Array, optional: true },
+    placeholder: { type: String, optional: true },
+    // new
+    intShowDecimal: { type: Boolean, optional: true },
+    intDecimalDigits: { type: Number, optional: true },
+}
+
+FloatFieldFormatX.defaultProps = {
+    inputType: "text",
+};
+
+FloatFieldFormatX.extractProps = ({ attrs, field }) => {
+    // Sadly, digits param was available as an option and an attr.
+    // The option version could be removed with some xml refactoring.
+    let digits;
+    if (attrs.digits) {
+        digits = JSON.parse(attrs.digits);
+    } else if (attrs.options.digits) {
+        digits = attrs.options.digits;
+    } else if (Array.isArray(field.digits)) {
+        digits = field.digits;
+    }
+    const intShowDecimal = archParseBoolean(attrs.options.intShowDecimal, true);
+    const intDecimalDigits = attrs.options.intDecimalDigits || 0;
+    return {
+        inputType: attrs.options.type,
+        step: attrs.options.step,
+        digits,
+        placeholder: attrs.placeholder,
+        intShowDecimal,
+        intDecimalDigits,
+    };
+};
+
+registry.category("fields").add('float_format_x', FloatFieldFormatX);
 ```
