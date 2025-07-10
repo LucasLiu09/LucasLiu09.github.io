@@ -61,6 +61,7 @@ const sidebars = {
           items: [
             'odoo/dev_notes/models/model_email_template',
             'odoo/dev_notes/models/constraints',
+            'odoo/dev_notes/models/create_database_view',
           ]
         },
         {
