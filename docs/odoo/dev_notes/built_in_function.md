@@ -256,6 +256,16 @@ self.user_has_groups(!group_name)
 - 需要优化搜索性能时
 - 需要基于域(domain)进行复杂过滤时
 
+:::info[参数说明]
+- `name` (str): (default='')用于匹配的名称模式。这是要搜索的文本模式，系统会根据这个模式来查找匹配的记录。
+- `args` (list): (default=None)可选的搜索域，用于指定进一步的搜索限制条件。这是一个遵循 Odoo 搜索语法的域表达式列表，可以添加额外的过滤条件。
+- `operator` (str): (default='ilike')用于匹配 name 参数的域操作符。常见的操作符包括：
+  - 'like': 模糊匹配（区分大小写）
+  - 'ilike': 模糊匹配（不区分大小写）
+  - '=': 精确匹配
+- `limit` (int): (default=100)可选的最大返回记录数限制。控制搜索结果的数量上限，避免返回过多的记录。
+:::
+
 基本_name_search()示例
 
 ```python
