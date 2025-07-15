@@ -249,6 +249,59 @@ self.user_has_groups(!group_name)
 
 > `_name_search()`是`name_search()`的底层实现方法，包含了实际的搜索逻辑。
 
+<details>
+  <summary>源码</summary>
+
+```python
+@api.model
+def name_search(self, name='', args=None, operator='ilike', limit=100):
+    """ name_search(name='', args=None, operator='ilike', limit=100) -> records
+
+    Search for records that have a display name matching the given
+    ``name`` pattern when compared with the given ``operator``, while also
+    matching the optional search domain (``args``).
+
+    This is used for example to provide suggestions based on a partial
+    value for a relational field. Should usually behave as the reverse of
+    :meth:`~.name_get`, but that is ont guaranteed.
+
+    This method is equivalent to calling :meth:`~.search` with a search
+    domain based on ``display_name`` and then :meth:`~.name_get` on the
+    result of the search.
+
+    :param str name: the name pattern to match
+    :param list args: optional search domain (see :meth:`~.search` for
+                      syntax), specifying further restrictions
+    :param str operator: domain operator for matching ``name``, such as
+                         ``'like'`` or ``'='``.
+    :param int limit: optional max number of records to return
+    :rtype: list
+    :return: list of pairs ``(id, text_repr)`` for all matching records.
+    """
+    ids = self._name_search(name, args, operator, limit=limit)
+    return self.browse(ids).sudo().name_get()
+
+@api.model
+def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get_uid=None):
+    """ _name_search(name='', args=None, operator='ilike', limit=100, name_get_uid=None) -> ids
+
+        Private implementation of name_search, allows passing a dedicated user
+        for the name_get part to solve some access rights issues.
+        """
+        args = list(args or [])
+        search_fnames = self._rec_names_search or ([self._rec_name] if self._rec_name else [])
+        if not search_fnames:
+            _logger.warning("Cannot execute name_search, no _rec_name or _rec_names_search defined on %s", self._name)
+        # optimize out the default criterion of ``like ''`` that matches everything
+        elif not (name == '' and operator in ('like', 'ilike')):
+            aggregator = expression.AND if operator in expression.NEGATIVE_TERM_OPERATORS else expression.OR
+            domain = aggregator([[(field_name, operator, name)] for field_name in search_fnames])
+            args += domain
+        return self._search(args, limit=limit, access_rights_uid=name_get_uid)
+```
+
+</details>
+
 适用_name_search()的场景
 
 - 需要自定义搜索逻辑时
@@ -266,7 +319,7 @@ self.user_has_groups(!group_name)
 - `limit` (int): (default=100)可选的最大返回记录数限制。控制搜索结果的数量上限，避免返回过多的记录。
 :::
 
-基本_name_search()示例
+### _name_search()基础用法
 
 ```python
 from odoo.osv import expression
@@ -285,6 +338,204 @@ def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get
         domain = expression.AND([('state', '!=', 'cancelled')])
         return super()._name_search(name=name, args=domain, operator=operator, limit=limit, name_get_uid=name_get_uid)
     return super()._name_search(name=name, args=args, operator=operator, limit=limit, name_get_uid=name_get_uid)
+```
+
+### 处理特殊操作符
+
+:::warning
+关于_name_search的代码片段均为用法举例，并非项目最佳实践，在实践中基于实际情况分析。
+:::
+
+```python
+@api.model
+def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get_uid=None):
+    args = list(args or [])
+    
+    # 优化空搜索
+    if not name and operator in ('like', 'ilike'):
+        return self._search(args, limit=limit, access_rights_uid=name_get_uid)
+    
+    # 处理不同的操作符
+    if operator == 'ilike':
+        # 不区分大小写的模糊匹配
+        search_domain = [
+            '|', '|',
+            ('name', 'ilike', name),
+            ('code', 'ilike', name),
+            ('display_name', 'ilike', name)
+        ]
+    elif operator == '=':
+        # 精确匹配
+        search_domain = [
+            '|', '|',
+            ('name', '=', name),
+            ('code', '=', name),
+            ('display_name', '=', name)
+        ]
+    elif operator in expression.NEGATIVE_TERM_OPERATORS:
+        # 负向操作符使用 AND 连接
+        search_domain = [
+            ('name', operator, name),
+            ('code', operator, name),
+            ('display_name', operator, name)
+        ]
+    else:
+        # 其他操作符
+        search_domain = [('name', operator, name)]
+    
+    args += search_domain
+    return self._search(args, limit=limit, access_rights_uid=name_get_uid)
+```
+
+### 优化字段搜索
+
+> 这个用法需要测试。
+
+```python
+@api.model
+def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get_uid=None):
+    args = list(args or [])
+    
+    if not name:
+        return self._search(args, limit=limit, access_rights_uid=name_get_uid)
+    
+    # 定义搜索字段的优先级
+    search_fields = [
+        ('code', 10),      # 代码匹配优先级最高
+        ('name', 8),       # 名称匹配
+        ('short_name', 6), # 简称匹配
+        ('alias', 4),      # 别名匹配
+    ]
+    
+    # 构建搜索域
+    search_domain = []
+    for field, priority in search_fields:
+        if self._fields.get(field):
+            search_domain.append((field, operator, name))
+    
+    # 使用 OR 连接所有搜索条件
+    if search_domain:
+        if len(search_domain) > 1:
+            domain = expression.OR([[domain] for domain in search_domain])
+        else:
+            domain = search_domain
+        args += domain
+    
+    return self._search(args, limit=limit, access_rights_uid=name_get_uid)
+```
+
+### 实现分词搜索
+
+```python
+@api.model
+def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get_uid=None):
+    args = list(args or [])
+    
+    if not name:
+        return self._search(args, limit=limit, access_rights_uid=name_get_uid)
+    
+    # 智能搜索逻辑
+    search_terms = name.strip().split()
+    
+    if len(search_terms) == 1:
+        # 单个搜索词
+        term = search_terms[0]
+        search_domain = [
+            '|', '|', '|',
+            ('code', operator, term),
+            ('name', operator, term),
+            ('short_name', operator, term),
+            ('description', operator, term)
+        ]
+    else:
+        # 多个搜索词，每个词都必须匹配
+        search_domain = []
+        for term in search_terms:
+            term_domain = [
+                '|', '|',
+                ('name', operator, term),
+                ('code', operator, term),
+                ('description', operator, term)
+            ]
+            search_domain.append(term_domain)
+        
+        # 使用 AND 连接多个搜索词
+        if search_domain:
+            search_domain = expression.AND(search_domain)
+    
+    args += search_domain
+    return self._search(args, limit=limit, access_rights_uid=name_get_uid)
+```
+
+### 考虑性能优化、优先精确匹配
+
+```python
+@api.model
+def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get_uid=None):
+    args = list(args or [])
+    
+    # 性能优化：限制搜索长度
+    if len(name) > 100:
+        name = name[:100]
+    
+    # 性能优化：优先搜索索引字段
+    if not name:
+        return self._search(args, limit=limit, access_rights_uid=name_get_uid)
+    
+    # 首先尝试精确匹配（通常更快）
+    if operator == 'ilike':
+        exact_args = args + [('code', '=', name)]
+        exact_ids = self._search(exact_args, limit=limit, access_rights_uid=name_get_uid)
+        
+        if exact_ids:
+            return exact_ids
+        
+        # 如果没有精确匹配，再进行模糊搜索
+        fuzzy_args = args + [
+            '|', '|',
+            ('name', 'ilike', name),
+            ('code', 'ilike', name),
+            ('short_name', 'ilike', name)
+        ]
+        return self._search(fuzzy_args, limit=limit, access_rights_uid=name_get_uid)
+    
+    # 其他操作符的处理
+    search_domain = [('name', operator, name)]
+    args += search_domain
+    return self._search(args, limit=limit, access_rights_uid=name_get_uid)
+```
+
+### 根据上下文调整逻辑
+
+```python
+@api.model
+def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get_uid=None):
+    args = list(args or [])
+    
+    # 根据上下文调整搜索逻辑
+    context = self.env.context
+    
+    # 特定模块的搜索优化
+    if context.get('search_default_active'):
+        args.append(('active', '=', True))
+    
+    # 基于用户角色的搜索过滤
+    if not self.env.user.has_group('base.group_system'):
+        args.append(('is_public', '=', True))
+    
+    if not name:
+        return self._search(args, limit=limit, access_rights_uid=name_get_uid)
+    
+    # 构建搜索域
+    search_domain = [
+        '|', '|',
+        ('name', operator, name),
+        ('code', operator, name),
+        ('display_name', operator, name)
+    ]
+    
+    args += search_domain
+    return self._search(args, limit=limit, access_rights_uid=name_get_uid)
 ```
 
 ## fields_get
