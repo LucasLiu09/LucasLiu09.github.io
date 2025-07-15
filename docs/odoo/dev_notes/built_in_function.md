@@ -249,6 +249,10 @@ self.user_has_groups(!group_name)
 
 > `_name_search()`是`name_search()`的底层实现方法，包含了实际的搜索逻辑。
 
+**如果只是想要搜索多个字段而不需要额外的处理，可以设置类属性`_rec_names_search`即可**，例如：
+
+`_rec_names_search = ['name', 'code']`
+
 <details>
   <summary>源码</summary>
 
@@ -321,6 +325,9 @@ def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get
 
 ### _name_search()基础用法
 
+在对`_name_search`进行重写的时候，对于**新增的自定义搜索逻辑**，直接**调用`self._search(args, limit=limit, access_rights_uid=name_get_uid)`并返回结果**即可。
+对于默认情况调用`super()._name_search()`
+
 ```python
 from odoo.osv import expression
 
@@ -332,11 +339,12 @@ def _name_search(self, name='', args=None, operator='ilike', limit=100, name_get
     if self._context.get('xxxx'):    # 通过context控制影响范围
         domain = []
         if name:
-            # 添加额外的搜索条件my_field
-            domain = expression.OR([args, [('my_field', operator, name)]])
+            # 添加额外的搜索条件
+            domain = expression.OR([[('code', operator, name)], [('name', operator, name)]])
         # 添加额外的过滤条件
-        domain = expression.AND([('state', '!=', 'cancelled')])
-        return super()._name_search(name=name, args=domain, operator=operator, limit=limit, name_get_uid=name_get_uid)
+        all_domain = expression.AND([args, domain, [('state', '!=', 'cancelled')]])
+        
+        return self._search(all_domain, limit=limit, access_rights_uid=name_get_uid)
     return super()._name_search(name=name, args=args, operator=operator, limit=limit, name_get_uid=name_get_uid)
 ```
 
