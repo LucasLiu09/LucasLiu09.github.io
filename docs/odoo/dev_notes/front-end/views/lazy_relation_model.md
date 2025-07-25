@@ -17,7 +17,7 @@ last_update:
 扩展`RelationalModel` -> `LazyRelationalModel`；实现`listView`在没有查询条件时，不加载数据。
 :::
 
-通过重写`**RelationalModel**`的`**load**` function，在其中判断如果无有效的查询条件时，不加载数据。
+通过重写**`RelationalMode -> load()`** function，在其中判断如果无有效的查询条件时，不加载数据。
 
 ```javascript
 import {registry} from "@web/core/registry";
