@@ -41,3 +41,39 @@ def utf8_slice_safe(text, start_byte=0, end_byte=None):
     sliced_bytes = utf8_bytes[start_byte:end_byte]
     return sliced_bytes.decode('utf-8', errors='ignore')
 ```
+
+## 字典排序
+
+```python
+# 原字典
+d = {'b': 2, 'a': 1, 'c': 3}
+
+# 按键排序（返回新字典）
+sorted_dict = dict(sorted(d.items()))
+# 结果: {'a': 1, 'b': 2, 'c': 3}
+
+# 按键逆序
+sorted_dict = dict(sorted(d.items(), reverse=True))
+# 结果: {'c': 3, 'b': 2, 'a': 1}
+
+2. 按值排序
+
+# 按值排序
+sorted_dict = dict(sorted(d.items(), key=lambda x: x[1]))
+# 结果: {'a': 1, 'b': 2, 'c': 3}
+
+# 按值逆序
+sorted_dict = dict(sorted(d.items(), key=lambda x: x[1], reverse=True))
+# 结果: {'c': 3, 'b': 2, 'a': 1}
+
+# 使用operator.itemgetter
+from operator import itemgetter
+sorted_dict = dict(sorted(d.items(), key=itemgetter(1)))
+
+# 对键进行处理之后排序，以下例子先按字符串再按数字排序
+def parse_key(key):
+    parts = key.split('-')
+    return (parts[0], int(parts[1]))
+
+sorted_dict = dict(sorted(d.items(), key=lambda x: parse_key(x[0])))
+```
