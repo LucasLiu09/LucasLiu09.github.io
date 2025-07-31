@@ -708,6 +708,39 @@ def fields_get(self, fields=None, attributes=None):
 
 > 检查字段循环关联，例如防止parent_id循环关联造成闭环。
 
+- **源码**
+```python
+def _check_recursion(self, parent=None):
+    """
+    Verifies that there is no loop in a hierarchical structure of records,
+    by following the parent relationship using the **parent** field until a
+    loop is detected or until a top-level record is found.
+
+    :param parent: optional parent field name (default: ``self._parent_name``)
+    :return: **True** if no loop was found, **False** otherwise.
+    """
+    if not parent:
+        parent = self._parent_name
+
+    # must ignore 'active' flag, ir.rules, etc. => direct SQL query
+    cr = self._cr
+    self.flush_model([parent])
+    query = 'SELECT "%s" FROM "%s" WHERE id = %%s' % (parent, self._table)
+    for id in self.ids:
+        current_id = id
+        seen_ids = {current_id}
+        while current_id:
+            cr.execute(query, (current_id,))
+            result = cr.fetchone()
+            current_id = result[0] if result else None
+            if current_id in seen_ids:
+                return False
+            seen_ids.add(current_id)
+    return True
+```
+
+用法：传入参数`parent`或通过`self._parent_name`指定字段，默认`_parent_name='parent_id'`.
+
 ```python
 from odoo.exceptions import ValidationError
 
