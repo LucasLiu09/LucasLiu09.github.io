@@ -201,40 +201,142 @@ export class DataService {
 ### 4.2 状态管理器
 
 ```javascript
+// 状态管理器类 - 继承自EventBus以支持事件发布功能
 export class StateManager extends EventBus {
-    constructor(initialState = {}) {
-        super();
-        this.state = { ...initialState };
-    }
+  /**
+   * 构造函数 - 初始化状态管理器
+   * @param {Object} initialState - 初始状态对象，默认为空对象
+   */
+  constructor(initialState = {}) {
+      super(); // 调用父类EventBus的构造函数
+      // 使用展开运算符创建状态的副本，避免外部直接修改内部状态
+      this.state = { ...initialState };
+  }
 
-    setState(updates) {
-        const prevState = { ...this.state };
-        Object.assign(this.state, updates);
+  /**
+   * 更新状态的方法
+   * @param {Object} updates - 要更新的状态字段对象
+   */
+  setState(updates) {
+      // 保存更新前的状态快照，用于事件通知和可能的撤销操作
+      const prevState = { ...this.state };
 
-        this.trigger("state-changed", {
-            prevState,
-            newState: { ...this.state },
-            updates
-        });
-    }
+      // 使用Object.assign将updates合并到当前状态
+      // 这会修改现有的state对象，新字段会被添加，已存在字段会被覆盖
+      Object.assign(this.state, updates);
 
-    getState() {
-        return { ...this.state };
-    }
+      // 触发状态变化事件，通知所有监听者
+      this.trigger("state-changed", {
+          prevState,                    // 变更前的状态（完整副本）
+          newState: { ...this.state }, // 变更后的状态（新副本，防止外部修改）
+          updates                       // 本次具体的更新内容
+      });
+  }
+
+  /**
+   * 获取当前状态的只读副本
+   * @returns {Object} 当前状态的副本
+   */
+  getState() {
+      // 返回状态副本而不是直接引用，防止外部意外修改内部状态
+      return { ...this.state };
+  }
 }
 
-// 在组件中使用状态管理器的钩子
+/**
+* React风格的状态管理钩子 - 在OWL组件中使用状态管理器
+* @param {StateManager} stateManager - 状态管理器实例
+* @returns {Array} [当前状态, 状态更新函数]
+*/
 export function useStateManager(stateManager) {
-    const component = useComponent();
-    const [state, setState] = useState(stateManager.getState());
+  // 获取当前组件实例，用于绑定事件监听器
+  const component = useComponent();
 
-    useBus(stateManager, "state-changed", (event) => {
-        setState(event.detail.newState);
-    });
+  // 使用OWL的useState钩子管理组件本地状态
+  // 初始值为状态管理器的当前状态
+  const [state, setState] = useState(stateManager.getState());
 
-    return [state, (updates) => stateManager.setState(updates)];
+  // 使用useBus钩子监听状态管理器的状态变化事件
+  // 当状态管理器触发"state-changed"事件时，自动更新组件状态
+  useBus(stateManager, "state-changed", (event) => {
+      // 从事件详情中提取新状态并更新组件状态
+      setState(event.detail.newState);
+  });
+
+  // 返回元组：[当前状态, 状态更新函数]
+  // 状态更新函数是对stateManager.setState的包装
+  return [state, (updates) => stateManager.setState(updates)];
+}
+
+使用示例（带注释）：
+
+import { Component } from "@odoo/owl";
+
+// 创建全局状态管理器实例
+const globalState = new StateManager({
+  user: null,
+  isLoading: false,
+  notifications: []
+});
+
+export class MyComponent extends Component {
+  setup() {
+      // 在组件中使用状态管理器
+      // state: 当前状态的只读副本
+      // updateState: 更新状态的函数
+      const [state, updateState] = useStateManager(globalState);
+
+      // 将状态和更新函数暴露给模板
+      this.state = state;
+      this.updateState = updateState;
+
+      // 也可以直接监听特定的状态变化
+      useBus(globalState, "state-changed", ({ detail }) => {
+          const { updates } = detail;
+          // 只在用户信息更新时执行特定逻辑
+          if ('user' in updates) {
+              console.log('用户信息已更新:', updates.user);
+          }
+      });
+  }
+
+  // 组件方法 - 登录用户
+  async loginUser(userData) {
+      // 设置加载状态
+      this.updateState({ isLoading: true });
+
+      try {
+          // 模拟异步登录操作
+          const user = await this.authenticateUser(userData);
+
+          // 登录成功，更新用户信息并清除加载状态
+          this.updateState({
+              user: user,
+              isLoading: false,
+              notifications: [...this.state.notifications, {
+                  type: 'success',
+                  message: '登录成功'
+              }]
+          });
+      } catch (error) {
+          // 登录失败，清除加载状态并添加错误通知
+          this.updateState({
+              isLoading: false,
+              notifications: [...this.state.notifications, {
+                  type: 'error',
+                  message: '登录失败: ' + error.message
+              }]
+          });
+      }
+  }
 }
 ```
+
+关键设计优点：
+1. 不可变性：通过返回状态副本确保数据不被意外修改
+2. 事件驱动：状态变化自动通知所有订阅者
+3. 类型安全：提供详细的事件载荷信息
+4. 调试友好：事件包含前后状态对比信息
 
 ### 4.3 事件批处理
 
