@@ -87,4 +87,55 @@ registry.category("views").add("sale_order_form_disable", saleOrderFormView)
 考虑以下方式处理：
 - 在FormController通过update this.model.root.mode的值来控制是否可编辑。
 - 在FormRenderer通过update this.props.record.mode的值来控制是否可编辑。
+
+例如：在FormController处理，通过调用`this.model.root.switchMode()`来变更编辑状态：
+```javascript
+useEffect((state)=>{
+    //console.log(this.model.root.data.state)
+    if (state === 'Y'){
+        this.model.root.switchMode("readonly");
+    }else{
+        this.model.root.switchMode("edit");
+    }
+}, ()=>[this.model.root.data.state])
+```
+
+以下为`switchMode`源码(addons/web/static/src/views/basic_relational_model.js):
+```javascript
+export class Record extends DataPoint {
+
+    //...
+
+    async switchMode(mode, options) {
+        if (this.mode === mode) {
+            return true;
+        }
+        const canSwitch = await this._onWillSwitchMode(this, mode, options);
+        if (canSwitch === false) {
+            return false;
+        }
+    
+        if (mode === "edit") {
+            // wait for potential pending changes to be saved (done with widgets
+            // allowing to edit in readonly)
+            await this.model.__bm__.mutex.getUnlockedDef();
+        }
+    
+        if (mode === "readonly") {
+            for (const fieldName in this.activeFields) {
+                if (["one2many", "many2many"].includes(this.fields[fieldName].type)) {
+                    const editedRecord = this.data[fieldName] && this.data[fieldName].editedRecord;
+                    if (editedRecord) {
+                        editedRecord.switchMode("readonly");
+                    }
+                }
+            }
+        }
+        this.mode = mode;
+        this.model.notify();
+        return true;
+    }
+}
+```
+
 :::
