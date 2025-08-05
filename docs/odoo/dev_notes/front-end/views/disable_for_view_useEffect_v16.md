@@ -138,4 +138,7 @@ export class Record extends DataPoint {
 }
 ```
 
+tips[插眼]: 在表单增加编辑按钮来启用编辑，也可以考虑此思路。
+
 :::
+
