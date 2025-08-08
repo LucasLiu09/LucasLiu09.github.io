@@ -156,11 +156,15 @@ def _onchange_eval(self, field_name, onchange, result):
 
 如果要实现在onchange函数中可以返回自定义的Dialog，考虑修改`BaseModel._onchange_eval`以接收更多的参数供前端使用，第二步修改`BaseModel.onchange`，对result插入更多的参数，第三步修改`basic_relational_model._trigger_up`以实现调用自定义Dialog。
 
-:::tips
+:::tip
 要继承基础模型修改原生逻辑，可以通过`_inherit = 'base'`进行重写，因为Base会被所有的模型隐式继承。
 :::
 
 ### 实现onchange之后弹窗附有操作按钮
+
+:::warning
+这里实现了弹窗附有操作按钮，但无实际意义，因为无法传递状态数据，无法对上游进行操作/更新。
+:::
 
 ```python
 import copy
