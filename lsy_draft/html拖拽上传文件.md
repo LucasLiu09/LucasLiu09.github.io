@@ -171,3 +171,35 @@ export const ExpenseDocumentUpload = {
 };
 
 ```
+
+上面例子中结合了下面的`getDataURLFromFile`来读取拖拽获取的文件。
+
+```javascript
+/**
+ * Gets dataURL (base64 data) from the given file or blob.
+ * Technically wraps FileReader.readAsDataURL in Promise.
+ *
+ * @param {Blob | File} file
+ * @returns {Promise} resolved with the dataURL, or rejected if the file is
+ *  empty or if an error occurs.
+ */
+export function getDataURLFromFile(file) {
+    if (!file) {
+        return Promise.reject();
+    }
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+            // Handle Chrome bug that creates invalid data URLs for empty files
+            if (reader.result === "data:") {
+                resolve(`data:${file.type};base64,`);
+            } else {
+                resolve(reader.result);
+            }
+        });
+        reader.addEventListener("abort", reject);
+        reader.addEventListener("error", reject);
+        reader.readAsDataURL(file);
+    });
+}
+```
