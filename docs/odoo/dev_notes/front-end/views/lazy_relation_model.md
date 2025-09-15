@@ -7,7 +7,7 @@ keyword:
     - odoo development
 tags: [odoo]
 last_update:
-  date: 2025/7/25
+  date: 2025/9/15
   author: Lucas
 ---
 
