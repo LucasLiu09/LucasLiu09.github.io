@@ -92,6 +92,89 @@ def export_xlsx(self):
     }
 ```
 
+### 将many2many(ir.attachment)打包成zip
+
+```python title="pack_attachments_to_zip"
+import zipfile
+import io
+import base64
+
+class YourModel(models.Model):
+    def pack_attachments_to_zip(self, attachment_ids,
+                            zip_filename="attachments.zip"):
+    """
+    将多个附件打包成zip格式并存储为新的附件
+
+    :param attachment_ids: many2many附件的ID列表
+    :param zip_filename: 生成的zip文件名
+    :return: 新创建的zip附件记录
+    """
+    # - 使用内存缓冲区避免创建临时文件
+    # - 支持自定义zip文件名
+    # - 保持原始文件名在zip包内
+    # - 返回新创建的ir.attachment记录
+    if not attachment_ids:
+        return False
+    if isinstance(attachment_ids, list):
+        attachment_ids = self.env['ir.attachment'].browse(attachment_ids)
+    if isinstance(attachment_ids, int):
+        attachment_ids = self.env['ir.attachment'].browse([attachment_ids])
+
+    # 创建内存中的zip文件
+    zip_buffer = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # 遍历所有附件
+        for attachment in attachment_ids:
+            if attachment.datas:
+                # 解码附件数据
+                file_data = base64.b64decode(attachment.datas)
+                # 添加到zip文件中，使用原始文件名
+                zip_file.writestr(attachment.name or f"file_{attachment.id}",
+                                  file_data)
+
+    # 获取zip文件的二进制数据
+    zip_buffer.seek(0)
+    zip_data = zip_buffer.getvalue()
+    zip_buffer.close()
+
+    # 编码为base64
+    zip_base64 = base64.b64encode(zip_data)
+
+    # 创建新的附件记录
+    zip_attachment = self.env['ir.attachment'].create({
+        'name': zip_filename,
+        'type': 'binary',
+        'datas': zip_base64,
+        'mimetype': 'application/zip',
+        'res_model': self._name,
+        'res_id': self.id,
+    })
+
+    return zip_attachment
+```
+
+使用示例
+
+```python
+# 在模型中调用
+class YourModel(models.Model):
+    _name = 'your.model'
+    
+    attachment_ids = fields.Many2many('ir.attachment', string='附件')
+    zip_attachment_id = fields.Many2one('ir.attachment', string='压缩包附件')      
+    
+    def create_zip_attachment(self):
+        if self.attachment_ids:
+            zip_attachment = self.pack_attachments_to_zip(
+              self.attachment_ids.ids,
+              f"attachments_{self.id}.zip"
+            )
+            self.zip_attachment_id = zip_attachment.id
+            return zip_attachment
+        return False
+```
+
 ### 通过_auto_init/init新建索引(index)
 
 使用示例: 以下是原生代码在hh_leave表上新增一条索引。此处用到odoo.tools.sql.craete_index(可以通过`from odoo.tools import create_index`引用)。
