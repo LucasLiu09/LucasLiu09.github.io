@@ -16,7 +16,7 @@ tags: [projectManager]
 - **颁发机构**: PMI (Project Management Institute)
 - **获得时间**: 2023年05月27日
 
-### CSPM-2 (Certified Strategic Project Manager)
+### CSPM-2 (China Standards Project Management)
 - **颁发机构**: 中国标准化协会
 - **获得时间**: 2023年09月15日
 
@@ -65,6 +65,14 @@ tags: [projectManager]
   alt="PRINCE2-Practitioner" width="800" height="600"
 />
 
+## 证书的对应认可关系
+
+<img
+  src={require('./assets/_images/证书对应认可关系图.jpg').default}
+  alt="证书对应认可关系图" width="800" height="600"
+/>
+
+> 图片来源：[项目管理人员评价信息系统](https://cspm.china-cas.org/gyks/331.jhtml)
 
 :::tip 专业建议
 这些认证涵盖了从传统项目管理到敏捷开发的完整技能体系
