@@ -16,7 +16,7 @@ tags: [projectManager]
 - **颁发机构**: PMI (Project Management Institute)
 - **获得时间**: 2023年05月27日
 
-### CSPM-2 (Certified Software Project Manager Level 2)
+### CSPM-2 (Certified Strategic Project Manager)
 - **颁发机构**: 中国标准化协会
 - **获得时间**: 2023年09月15日
 
