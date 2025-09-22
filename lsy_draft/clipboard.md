@@ -32,6 +32,13 @@
 
 import {Component, useRef} from "@odoo/owl";
 
+// 检查 API 支持性
+function isClipboardSupported() {
+    return navigator.clipboard &&
+        typeof navigator.clipboard.read === 'function';
+}
+
+
 export class ClipboardL extends Component {
     setup() {
         this.text1Ref = useRef("text1");
@@ -44,7 +51,12 @@ export class ClipboardL extends Component {
     }
 
     async onCopyFromCopyboard() {
+        if (!isClipboardSupported()) {
+            console.log('浏览器不支持 Clipboard API');
+            return null;
+        }
         try {
+
             // Clipboard 接口的 read() 方法可用于请求获取剪贴板的内容，返回将兑现为剪贴板数据的 Promise。  如果希望只读取文本，则应该使用 readText() 方法。
             const clipboardContents = await navigator.clipboard.read();
             for (const item of clipboardContents) {
