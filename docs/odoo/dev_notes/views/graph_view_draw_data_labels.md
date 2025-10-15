@@ -15,9 +15,15 @@ last_update:
 
 :::info[Note]
 
-因为`chartjs`默认无法显示数据的标签，所以需要额外处理。
+## 背景
 
+因为`chartjs`默认不显示数据的标签，所以需要额外处理。
 
+![before_bar_1](../_images/graph_view_draw_data_labels_before_bar1.png)
+
+![before_line_1](../_images/graph_view_draw_data_labels_before_line1.png)
+
+## 分析、修改
 
 本文将对`Graph View`进行扩展，以支持绘制数据的标签。（以`odoo16`为例，`chartjs`版本为`2.9.3`）
 
