@@ -88,9 +88,9 @@ export class GraphRendererDrawDataLabel extends GraphRenderer{
 
 ## 更新后效果图
 
-![after_bar_1](../../_images/graph_view_draw_data_labels_after_bar1.png)
+![after_bar_1](../_images/graph_view_draw_data_labels_after_bar1.png)
 
-![after_line_1](../../_images/graph_view_draw_data_labels_after_line1.png)
+![after_line_1](../_images/graph_view_draw_data_labels_after_line1.png)
 
 :::tips[TIPS]
 
