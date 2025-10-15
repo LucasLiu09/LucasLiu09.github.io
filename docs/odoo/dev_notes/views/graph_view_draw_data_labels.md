@@ -13,11 +13,13 @@ last_update:
 
 # Graph View 绘制数据label
 
-:::info[Note]
-
 ## 背景
 
+:::info[Note]
+
 因为`chartjs`默认不显示数据的标签，所以需要额外处理。
+
+:::
 
 ![before_bar_1](../_images/graph_view_draw_data_labels_before_bar1.png)
 
@@ -27,7 +29,7 @@ last_update:
 
 本文将对`Graph View`进行扩展，以支持绘制数据的标签。（以`odoo16`为例，`chartjs`版本为`2.9.3`）
 
-:::
+
 
 `chartjs`默认需要鼠标移动到图标上才会显示数值，这种方式不够直观，而且当用户下载图表时就无法查看数值了。
 
