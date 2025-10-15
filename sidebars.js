@@ -51,6 +51,7 @@ const sidebars = {
             'odoo/dev_notes/views/form_view',
             'odoo/dev_notes/views/kanban_view',
             'odoo/dev_notes/views/search_view',
+            'odoo/dev_notes/views/graph_view_draw_data_labels',
             'odoo/dev_notes/views/view_and_xml_restrictions',
             'odoo/dev_notes/views/create_a_new_view_v17',
           ]
