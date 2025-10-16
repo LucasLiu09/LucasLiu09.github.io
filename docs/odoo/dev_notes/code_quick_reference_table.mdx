@@ -289,6 +289,15 @@ def create_index(cr, indexname, tablename, expressions, method='btree', where=''
 
         ]"/>
 
+<!-- 如果年份是integer -->
+
+<filter string="今年" name="filter_current_year"  domain="[('year','=', context_today().strftime('%Y'))]"/>
+<filter name="filter_last_three_years" string="近三年"
+    domain="[
+        '&amp;',
+        ('year', '&gt;=', ( context_today() + relativedelta(years=-2) ).strftime('%Y')),
+        ('year', '&lt;=', context_today().strftime('%Y'))]"/>
+
 ```
 
 ### Search View - Searchpanel
