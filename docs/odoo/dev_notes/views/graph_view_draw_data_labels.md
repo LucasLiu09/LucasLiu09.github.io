@@ -100,7 +100,7 @@ export class GraphRendererDrawDataLabel extends GraphRenderer{
 
 ![after_line_1](../_images/graph_view_draw_data_labels_after_line1.png)
 
-:::tips[TIPS]
+:::tip[TIPS]
 
 chartjs版本大于3.x时，可以使用插件[chartjs-plugin-datalabels](https://github.com/chartjs/chartjs-plugin-datalabels)实现。
 
