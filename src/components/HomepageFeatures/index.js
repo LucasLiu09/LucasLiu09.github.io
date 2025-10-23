@@ -18,9 +18,9 @@ const FeatureList = [
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
-        * <code>CSPM</code><br/>
-        * <code>Project Management Professional (PMP)®</code><br/>
-        * <code>PRINCE2® Practitioner Certificate in Project Management</code>
+        <p>* <code>CSPM</code></p>
+        <p>* <code>Project Management Professional (PMP)®</code></p>
+        <p>* <code>PRINCE2® Practitioner Certificate in Project Management</code></p>
       </>
     ),
   },
@@ -42,9 +42,9 @@ function Feature({Svg, title, description}) {
       <div className="text--center">
         <Svg className={styles.featureSvg} role="img" />
       </div>
-      <div className="text--center padding-horiz--md">
+      <div className="text--left padding-horiz--md">
         <Heading as="h3">{title}</Heading>
-        <p>{description}</p>
+        <div>{description}</div>
       </div>
     </div>
   );
