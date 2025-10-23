@@ -93,19 +93,19 @@ const config = {
           {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
-            position: 'left',
+            position: 'right',
             label: 'Docusaurus',
           },
           {
             type: 'docSidebar',
             sidebarId: 'odooSidebar',
-            position: 'left',
+            position: 'right',
             label: 'Odoo',
           },
           {
             type: 'docSidebar',
             sidebarId: 'projectManagerSidebar',
-            position: 'left',
+            position: 'right',
             label: '项目管理',
           },
           {
@@ -116,7 +116,7 @@ const config = {
         ],
       },
       footer: {
-        style: 'dark',
+        style: 'light',
         links: [
           {
             title: 'Docs',
