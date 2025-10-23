@@ -14,7 +14,7 @@ const FeatureList = [
     ),
   },
   {
-    title: '项目管理',
+    title: '项目管理资质认证',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
@@ -24,16 +24,6 @@ const FeatureList = [
       </>
     ),
   },
-//  {
-//    title: 'Powered by React',
-//    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
-//    description: (
-//      <>
-//        Extend or customize your website layout by reusing React. Docusaurus can
-//        be extended while reusing the same header and footer.
-//      </>
-//    ),
-//  },
 ];
 
 function Feature({Svg, title, description}) {
