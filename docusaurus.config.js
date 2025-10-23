@@ -12,7 +12,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 const config = {
   title: "Lucas's Notebook",
   tagline: '分享思考 · 记录成长 · 探索世界',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/home/favicon.ico',
 
   // Set the production url of your site here
   url: 'https://lucasliu09.github.io',
