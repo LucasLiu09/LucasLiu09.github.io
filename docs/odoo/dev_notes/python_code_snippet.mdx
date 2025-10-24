@@ -74,6 +74,8 @@ class ExcelWriter:
         """
         初始化 Excel 写入器
 
+        # TODO: 设置默认样式( xlsxwriter.Workbook(filename, options), 通过options传入default_format_properties )
+
         Args:
             filename: Excel 文件名（包含路径）
         """
@@ -544,6 +546,8 @@ class ExcelWriter:
                  track_column_width: bool = True):
         """
         初始化 Excel 写入器
+
+        # TODO: 设置默认样式( xlsxwriter.Workbook(filename, options), 通过options传入default_format_properties )
 
         Args:
             bytes_data: BytesIO 对象（可选）
@@ -1317,6 +1321,7 @@ sorted_dict = dict(sorted(d.items(), key=lambda x: natural_sort_key(x[0])))
 ```
 
 ---
+
 
 
 
