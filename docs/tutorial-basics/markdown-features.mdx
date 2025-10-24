@@ -80,28 +80,94 @@ function HelloDocusaurus() {
 Docusaurus has a special syntax to create admonitions and callouts:
 
 ```md
-:::tip My tip
+:::note
 
-Use this awesome feature option
+Some **content** with _Markdown_ `syntax`. Check [this `api`](#).
 
 :::
 
-:::danger Take care
+:::tip
 
-This action is dangerous
+Some **content** with _Markdown_ `syntax`. Check [this `api`](#).
+
+:::
+
+:::info
+
+Some **content** with _Markdown_ `syntax`. Check [this `api`](#).
+
+:::
+
+:::warning
+
+Some **content** with _Markdown_ `syntax`. Check [this `api`](#).
+
+:::
+
+:::danger
+
+Some **content** with _Markdown_ `syntax`. Check [this `api`](#).
 
 :::
 ```
 
-:::tip My tip
+:::note
 
-Use this awesome feature option
+Some **content** with _Markdown_ `syntax`. Check [this `api`](#).
 
 :::
 
-:::danger Take care
+:::tip
 
-This action is dangerous
+Some **content** with _Markdown_ `syntax`. Check [this `api`](#).
+
+:::
+
+:::info
+
+Some **content** with _Markdown_ `syntax`. Check [this `api`](#).
+
+:::
+
+:::warning
+
+Some **content** with _Markdown_ `syntax`. Check [this `api`](#).
+
+:::
+
+:::danger
+
+Some **content** with _Markdown_ `syntax`. Check [this `api`](#).
+
+:::
+
+## Admonitions with MDX {#admonitions-with-mdx}
+
+You can use MDX inside admonitions too!
+
+```jsx
+import Tabs from '@theme/Tabs';
+
+import TabItem from '@theme/TabItem';
+
+:::tip[Use tabs in admonitions]
+
+<Tabs>
+  <TabItem value="apple" label="Apple">This is an apple 🍎</TabItem>
+  <TabItem value="orange" label="Orange">This is an orange 🍊</TabItem>
+  <TabItem value="banana" label="Banana">This is a banana 🍌</TabItem>
+</Tabs>
+
+:::
+```
+
+:::tip[Use tabs in admonitions]
+
+<Tabs>
+  <TabItem value="apple" label="Apple">This is an apple 🍎</TabItem>
+  <TabItem value="orange" label="Orange">This is an orange 🍊</TabItem>
+  <TabItem value="banana" label="Banana">This is a banana 🍌</TabItem>
+</Tabs>
 
 :::
 
