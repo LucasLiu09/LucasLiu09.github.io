@@ -2025,6 +2025,8 @@ locust -f locustfile.py --host=https://erp.example.com --worker --master-host=19
 
 Web UI 提供以下监控指标：
 
+![screenshot1](../_images/odoo_locust_stress_test_screenshot1.png)
+
 **统计信息（Statistics）**：
 - Request：请求路径
 - Type：请求类型（GET/POST）
@@ -3125,6 +3127,7 @@ class MyTaskSet(TaskSet):
 **文档版本**：v1.0  
 **最后更新**：2025-11-05 
 **维护者**：Lucas
+
 
 
 
