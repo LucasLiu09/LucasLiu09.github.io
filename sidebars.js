@@ -138,6 +138,7 @@ const sidebars = {
         },
         'odoo/dev_notes/translate',
         'odoo/dev_notes/code_quick_reference_table',
+        'odoo/dev_notes/common/Odoo_Locust_Stress_Test',
         'odoo/dev_notes/common/add_table_change_log',
         'odoo/dev_notes/python_code_snippet',
         'others/python_patterns',
