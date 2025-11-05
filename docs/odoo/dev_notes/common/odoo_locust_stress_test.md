@@ -30,6 +30,10 @@ last_update:
 
 ---
 
+![image1](../_images/odoo_locust_stress_test.png)
+
+---
+
 ## 概述
 
 ### Locust 框架介绍
@@ -3121,5 +3125,6 @@ class MyTaskSet(TaskSet):
 **文档版本**：v1.0  
 **最后更新**：2025-11-05 
 **维护者**：Lucas
+
 
 
