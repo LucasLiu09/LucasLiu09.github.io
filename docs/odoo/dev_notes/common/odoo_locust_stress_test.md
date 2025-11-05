@@ -1,4 +1,17 @@
-# Odoo Locust 压力测试最佳实践指南
+---
+title: Odoo压力测试实践指南(Locust)
+description: Odoo压力测试实践指南(Locust)
+sidebar_label: Odoo压力测试实践指南(Locust)
+keyword:
+    - odoo
+    - odoo development
+tags: [odoo]
+last_update:
+  date: 2025/11/5
+  author: Lucas
+---
+
+# Odoo压力测试实践指南(Locust)
 
 ## 📋 目录
 
@@ -3108,4 +3121,5 @@ class MyTaskSet(TaskSet):
 **文档版本**：v1.0  
 **最后更新**：2025-11-05 
 **维护者**：Lucas
+
 
