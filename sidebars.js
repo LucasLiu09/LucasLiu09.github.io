@@ -77,6 +77,13 @@ const sidebars = {
                     'odoo/dev_notes/source_code_analysis/fields/binary_field_analysis',
                 ]
             },
+            {
+                type: 'category',
+                label: 'Views',
+                items: [
+                    'odoo/dev_notes/source_code_analysis/views/list_view_open_record_dynamic',
+                ]
+             },
             'odoo/dev_notes/check_credentials',
             'odoo/dev_notes/xml_rpc',
             'odoo/dev_notes/owl_dialog',
