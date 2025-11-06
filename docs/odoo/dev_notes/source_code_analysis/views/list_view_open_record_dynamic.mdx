@@ -145,13 +145,7 @@ export class ListController extends Component {
 
 那么查看`list_arch_parser.js`文件，找到`ListArchParser.parse()`方法，查阅该方法，可以发现`openAction`属性是包含在tree/list标签内设置。
 
-至此，我们知道了需要实现本章节需要的所有内容。
-
-实现步骤：
-1. 在tree view上设置`action`和`type`属性，`type="object" action="open_record_dynamic_func_name"`。
-2. 编写`open_record_dynamic_func_name`的逻辑，根据需求编写自定义逻辑，最终返回一个action，返回的action最好是由`self.env['ir.actions.act_window']._for_xml_id('xml_id')`得到的字典进行转换。
-
-```javascript
+```javascript title="list_arch_parser.js"
 export class ListArchParser extends XMLParser {
     
     //...
@@ -188,6 +182,12 @@ export class ListArchParser extends XMLParser {
     }
 }
 ```
+
+至此，我们知道了需要实现本章节需要的所有内容。
+
+实现步骤：
+1. 在tree view上设置`action`和`type`属性，`type="object" action="open_record_dynamic_func_name"`。
+2. 编写`open_record_dynamic_func_name`的逻辑，根据需求编写自定义逻辑，最终返回一个action，返回的action最好是由`self.env['ir.actions.act_window']._for_xml_id('xml_id')`得到的字典进行转换。
 
 ## 查看源码
 
