@@ -27,7 +27,13 @@ import TabItem from '@theme/TabItem';
 
 总结用户需求就是希望点击列表界面的一行数据时，根据数据的差异打开不同的Form界面。
 
-## 解析与实现
+## 🤺先说结论
+
+实现步骤：
+1. 在tree view上设置`action`和`type`属性，`type="object" action="open_record_dynamic_func_name"`。
+2. 编写`open_record_dynamic_func_name`的逻辑，根据需求编写自定义逻辑，最终返回一个action，返回的action最好是由`self.env['ir.actions.act_window']._for_xml_id('xml_id')`得到的字典进行转换。
+
+## 📄解析过程
 
 下面我们基于Odoo16版本的代码来做一个解析(解析过程中均为片段，完整源码在底部列出)：
 
