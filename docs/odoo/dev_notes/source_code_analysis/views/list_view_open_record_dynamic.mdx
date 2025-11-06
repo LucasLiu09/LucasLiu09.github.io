@@ -1,0 +1,4848 @@
+---
+title: List View - 动态指定打开界面
+description: List View - 动态指定打开界面
+sidebar_label: List View - 动态指定打开界面
+keyword:
+    - odoo
+    - odoo development
+tags: [odoo]
+last_update:
+  date: 2025/11/6
+  author: Lucas
+---
+
+import Tabs from '@theme/Tabs';
+
+import TabItem from '@theme/TabItem';
+
+# List View - 动态指定打开界面
+
+:::note[背景]
+
+：🦾我想要在列表页面点击一行数据时，属于这个类型打开这个界面，那个类型打开另一个界面。
+
+：嗯。。。行
+
+:::
+
+总结用户需求就是希望点击列表界面的一行数据时，根据数据的差异打开不同的Form界面。
+
+## 解析与实现
+
+下面我们基于Odoo16版本的代码来做一个解析(解析过程中均为片段，完整源码在底部列出)：
+
+那么我们从最外层往回推，最外层是`List View`，负责渲染列表的是`ListRenderer`。
+
+从`ListRenderer`中不难发现，行数据属于template: `web.ListRenderer.RecordRow`，进而找到行内元素`column.type='field'`的点击事件：`t-on-click="(ev) => this.onCellClicked(record, column, ev)"`
+
+<details>
+    <summary>onCellClicked()</summary>
+
+```javascript
+export class ListRenderer extends Component { 
+    //...
+    
+    async onCellClicked(record, column, ev) {
+        if (ev.target.special_click) {
+            return;
+        }
+        const recordAfterResequence = async () => {
+            const recordIndex = this.props.list.records.indexOf(record);
+            await this.resequencePromise;
+            // row might have changed record after resequence
+            record = this.props.list.records[recordIndex] || record;
+        };
+    
+        if ((this.props.list.model.multiEdit && record.selected) || this.isInlineEditable(record)) {
+            if (record.isInEdition && this.props.list.editedRecord === record) {
+                const cell = this.tableRef.el.querySelector(
+                    `.o_selected_row td[name='${column.name}']`
+                );
+                if (cell && containsActiveElement(cell)) {
+                    this.lastEditedCell = { column, record };
+                    // Cell is already focused.
+                    return;
+                }
+                this.focusCell(column);
+                this.cellToFocus = null;
+            } else {
+                await recordAfterResequence();
+                await record.switchMode("edit");
+                this.cellToFocus = { column, record };
+            }
+        } else if (this.props.list.editedRecord && this.props.list.editedRecord !== record) {
+            this.props.list.unselectRecord(true);
+        } else if (!this.props.archInfo.noOpen) {
+            this.props.openRecord(record);
+        }
+    }
+}
+```
+
+</details>
+
+
+那么进一步来到`list_renderer.js`，查看`ListRenderer.onCellClicked()`，从这个function可以看到打开界面的逻辑由**`this.props.openRecord(record)`**负责处理
+
+`ListRenderer`在这里的父组件是`ListController`，查看`List_controller.xml`文件，来确认`this.props.openRecord`绑定的是父组件的哪一个函数。
+
+以下代码摘自`list_controller.xml`，找到`<t t-component="props.Renderer"/>`，此处引用的`component`由`ListController.props.Renderer`指定，指定的位置位于`list_view.js` -> `const listView`.(原生代码指定的便是`ListRenderer`)
+
+```xml title="list_controller.xml 片段"
+<t t-component="props.Renderer" list="model.root" activeActions="activeActions" archInfo="archInfo" allowSelectors="props.allowSelectors" editable="editable" openRecord.bind="openRecord" noContentHelp="props.info.noContentHelp" onAdd.bind="createRecord" onOptionalFieldsChanged.bind="onOptionalFieldsChanged"/>
+```
+
+从这里可以看到`ListRenderer.props.openRecord`绑定的是`ListController.openRecord()`.
+
+```javascript title="list_controller.js 片段"
+export class ListController extends Component {
+    // ...
+    async openRecord(record) {
+        if (this.archInfo.openAction) {
+            this.actionService.doActionButton({
+                name: this.archInfo.openAction.action,
+                type: this.archInfo.openAction.type,
+                resModel: record.resModel,
+                resId: record.resId,
+                resIds: record.resIds,
+                context: record.context,
+                onClose: async () => {
+                    await record.model.root.load();
+                    record.model.notify();
+                },
+            });
+        } else {
+            const activeIds = this.model.root.records.map((datapoint) => datapoint.resId);
+            this.props.selectRecord(record.resId, { activeIds });
+        }
+    }
+}
+```
+
+本章节的关键就在于这个`openRecord()`函数，我们可以看到当`this.archInfo.openAction`成立时，将会调用`this.actionService.doActionButton()`进行跳转。
+
+`doActionButton`: 在当前操作之上执行`doAction`操作（通常用于单击视图中的按钮），type可以是`object`、`action`，当`type="object"`时，将会调用给定模型的给定方法，这个方法将会返回一个action用于后续跳转。
+
+先说这里可以通过`doActionButton`能做到什么事情:
+
+1. 指定`type="action"`：直接跳转到action指定的界面。传入的action是字符串，在xml中编写的ir.actions.act_window的id。
+2. 指定`type="object"`：调用给定模型的方法，可以在方法中自定义逻辑来指定跳转的action，从而实现动态打开界面。
+
+**本章节的需求主要是通过第2种方式来实现。**
+
+:::note
+对于`doActionButton`的详细说明，请查看文档(暂未编写)，可自行查阅源码addons/web/static/src/webclient/actions/action_service.js.
+:::
+
+
+再过头来看`archInfo.openAction`是如何指定的，View的archInfo通常由`<ViewType>ArchParser`(extends XMLParser)解析得到
+
+那么查看`list_arch_parser.js`文件，找到`ListArchParser.parse()`方法，查阅该方法，可以发现`openAction`属性是包含在tree/list标签内设置。
+
+至此，我们知道了需要实现本章节需要的所有内容。
+
+实现步骤：
+1. 在tree view上设置`action`和`type`属性，`type="object" action="open_record_dynamic_func_name"`。
+2. 编写`open_record_dynamic_func_name`的逻辑，根据需求编写自定义逻辑，最终返回一个action，返回的action最好是由`self.env['ir.actions.act_window']._for_xml_id('xml_id')`得到的字典进行转换。
+
+```javascript
+export class ListArchParser extends XMLParser {
+    
+    //...
+
+    parse(arch, models, modelName) {
+        //...
+        this.visitXML(arch, (node) => {
+            if (node.tagName !== "button") {
+                buttonGroup = undefined;
+            }
+            if (node.tagName === "button") {
+                //...
+            } else if (node.tagName === "field") {
+                //...
+            } else if (node.tagName === "widget") {
+                //...
+            } else if (node.tagName === "groupby" && node.getAttribute("name")) {
+                //...
+            } else if (node.tagName === "header") {
+                //...
+            } else if (node.tagName === "control") {
+                //...
+            } else if (["tree", "list"].includes(node.tagName)) {
+                //...
+
+                // custom open action when clicking on record row
+                const action = xmlDoc.getAttribute("action");
+                const type = xmlDoc.getAttribute("type");
+                treeAttr.openAction = action && type ? { action, type } : null;
+            }
+        });
+
+        //...
+    }
+}
+```
+
+## 查看源码
+
+<Tabs>
+  <TabItem value="list_view" label="list_view.js">
+
+```javascript title="list_view.js"
+/** @odoo-module */
+
+import { registry } from "@web/core/registry";
+import { RelationalModel } from "../relational_model";
+import { ListArchParser } from "./list_arch_parser";
+import { ListController } from "./list_controller";
+import { ListRenderer } from "./list_renderer";
+
+export const listView = {
+    type: "list",
+    display_name: "List",
+    icon: "oi oi-view-list",
+    accessKey: "l",
+    multiRecord: true,
+    Controller: ListController,
+    Renderer: ListRenderer,
+    ArchParser: ListArchParser,
+    Model: RelationalModel,
+    buttonTemplate: "web.ListView.Buttons",
+
+    props: (genericProps, view) => {
+        const { ArchParser } = view;
+        const { arch, relatedModels, resModel } = genericProps;
+        const archInfo = new ArchParser().parse(arch, relatedModels, resModel);
+
+        return {
+            ...genericProps,
+            Model: view.Model,
+            Renderer: view.Renderer,
+            buttonTemplate: view.buttonTemplate,
+            archInfo,
+        };
+    },
+};
+
+registry.category("views").add("list", listView);
+
+```
+
+  </TabItem>
+  <TabItem value="list_arch_parser" label="list_arch_parser.js">
+
+```javascript title="list_arch_parser.js"
+/** @odoo-module */
+
+import {
+    addFieldDependencies,
+    archParseBoolean,
+    getActiveActions,
+    getDecoration,
+    processButton,
+    stringToOrderBy,
+} from "@web/views/utils";
+import { Field } from "@web/views/fields/field";
+import { XMLParser } from "@web/core/utils/xml";
+import { Widget } from "@web/views/widgets/widget";
+import { encodeObjectForTemplate } from "@web/views/view_compiler";
+
+export class GroupListArchParser extends XMLParser {
+    parse(arch, models, modelName, jsClass) {
+        const fieldNodes = {};
+        const buttons = [];
+        let buttonId = 0;
+        this.visitXML(arch, (node) => {
+            if (node.tagName === "button") {
+                buttons.push({
+                    ...processButton(node),
+                    id: buttonId++,
+                });
+                return false;
+            } else if (node.tagName === "field") {
+                const fieldInfo = Field.parseFieldNode(node, models, modelName, "list", jsClass);
+                fieldNodes[fieldInfo.name] = fieldInfo;
+                node.setAttribute("field_id", fieldInfo.name);
+                return false;
+            }
+        });
+        return { fieldNodes, buttons };
+    }
+}
+
+export class ListArchParser extends XMLParser {
+    isColumnVisible(columnInvisibleModifier) {
+        return columnInvisibleModifier !== true;
+    }
+
+    parseFieldNode(node, models, modelName) {
+        return Field.parseFieldNode(node, models, modelName, "list");
+    }
+
+    parseWidgetNode(node, models, modelName) {
+        return Widget.parseWidgetNode(node);
+    }
+
+    processButton(node) {
+        return processButton(node);
+    }
+
+    parse(arch, models, modelName) {
+        const xmlDoc = this.parseXML(arch);
+        const fieldNodes = {};
+        const columns = [];
+        const fields = models[modelName];
+        let buttonId = 0;
+        const groupBy = {
+            buttons: {},
+            fields: {},
+        };
+        let headerButtons = [];
+        const creates = [];
+        const groupListArchParser = new GroupListArchParser();
+        let buttonGroup;
+        let handleField = null;
+        let defaultOrder = stringToOrderBy(xmlDoc.getAttribute("default_order") || null);
+        const treeAttr = {};
+        let nextId = 0;
+        const activeFields = {};
+        this.visitXML(arch, (node) => {
+            if (node.tagName !== "button") {
+                buttonGroup = undefined;
+            }
+            if (node.tagName === "button") {
+                const modifiers = JSON.parse(node.getAttribute("modifiers") || "{}");
+                if (this.isColumnVisible(modifiers.column_invisible)) {
+                    const button = {
+                        ...this.processButton(node),
+                        defaultRank: "btn-link",
+                        type: "button",
+                        id: buttonId++,
+                    };
+                    if (buttonGroup) {
+                        buttonGroup.buttons.push(button);
+                    } else {
+                        buttonGroup = {
+                            id: `column_${nextId++}`,
+                            type: "button_group",
+                            buttons: [button],
+                            hasLabel: false,
+                        };
+                        columns.push(buttonGroup);
+                    }
+                }
+            } else if (node.tagName === "field") {
+                const fieldInfo = this.parseFieldNode(node, models, modelName);
+                fieldNodes[fieldInfo.name] = fieldInfo;
+                node.setAttribute("field_id", fieldInfo.name);
+                if (fieldInfo.widget === "handle") {
+                    handleField = fieldInfo.name;
+                }
+                addFieldDependencies(
+                    activeFields,
+                    models[modelName],
+                    fieldInfo.FieldComponent.fieldDependencies
+                );
+                if (this.isColumnVisible(fieldInfo.modifiers.column_invisible)) {
+                    const label = fieldInfo.FieldComponent.label;
+                    columns.push({
+                        ...fieldInfo,
+                        id: `column_${nextId++}`,
+                        className: node.getAttribute("class"), // for oe_edit_only and oe_read_only
+                        optional: node.getAttribute("optional") || false,
+                        type: "field",
+                        hasLabel: !(fieldInfo.noLabel || fieldInfo.FieldComponent.noLabel),
+                        label: (fieldInfo.widget && label && label.toString()) || fieldInfo.string,
+                    });
+                }
+                return false;
+            } else if (node.tagName === "widget") {
+                const widgetInfo = this.parseWidgetNode(node);
+                addFieldDependencies(
+                    activeFields,
+                    models[modelName],
+                    widgetInfo.WidgetComponent.fieldDependencies
+                );
+
+                const widgetProps = {
+                    ...widgetInfo,
+                    // FIXME: this is dumb, we encode it into a weird object so that the widget
+                    // can decode it later...
+                    node: encodeObjectForTemplate({ attrs: widgetInfo.rawAttrs }).slice(1, -1),
+                    className: node.getAttribute("class"),
+                };
+                columns.push({
+                    ...widgetInfo,
+                    props: widgetProps,
+                    id: `column_${nextId++}`,
+                    type: "widget",
+                });
+            } else if (node.tagName === "groupby" && node.getAttribute("name")) {
+                const fieldName = node.getAttribute("name");
+                const xmlSerializer = new XMLSerializer();
+                const groupByArch = xmlSerializer.serializeToString(node);
+                const coModelName = fields[fieldName].relation;
+                const groupByArchInfo = groupListArchParser.parse(groupByArch, models, coModelName);
+                groupBy.buttons[fieldName] = groupByArchInfo.buttons;
+                groupBy.fields[fieldName] = {
+                    activeFields: groupByArchInfo.fieldNodes,
+                    fieldNodes: groupByArchInfo.fieldNodes,
+                    fields: models[coModelName],
+                };
+                return false;
+            } else if (node.tagName === "header") {
+                // AAB: not sure we need to handle invisible="1" button as the usecase seems way
+                // less relevant than for fields (so for buttons, relying on the modifiers logic
+                // that applies later on could be enough, even if the value is always true)
+                headerButtons = [...node.children]
+                    .map((node) => ({
+                        ...processButton(node),
+                        type: "button",
+                        id: buttonId++,
+                    }))
+                    .filter((button) => button.modifiers.invisible !== true);
+                return false;
+            } else if (node.tagName === "control") {
+                for (const childNode of node.children) {
+                    if (childNode.tagName === "button") {
+                        creates.push({
+                            type: "button",
+                            ...processButton(childNode),
+                        });
+                    } else if (childNode.tagName === "create") {
+                        creates.push({
+                            type: "create",
+                            context: childNode.getAttribute("context"),
+                            string: childNode.getAttribute("string"),
+                        });
+                    }
+                }
+                return false;
+            } else if (["tree", "list"].includes(node.tagName)) {
+                const activeActions = {
+                    ...getActiveActions(xmlDoc),
+                    exportXlsx: archParseBoolean(xmlDoc.getAttribute("export_xlsx"), true),
+                };
+                treeAttr.activeActions = activeActions;
+
+                treeAttr.className = xmlDoc.getAttribute("class") || null;
+                treeAttr.editable = activeActions.edit ? xmlDoc.getAttribute("editable") : false;
+                treeAttr.multiEdit = activeActions.edit
+                    ? archParseBoolean(node.getAttribute("multi_edit") || "")
+                    : false;
+
+                const limitAttr = node.getAttribute("limit");
+                treeAttr.limit = limitAttr && parseInt(limitAttr, 10);
+
+                const countLimitAttr = node.getAttribute("count_limit");
+                treeAttr.countLimit = countLimitAttr && parseInt(countLimitAttr, 10);
+
+                const groupsLimitAttr = node.getAttribute("groups_limit");
+                treeAttr.groupsLimit = groupsLimitAttr && parseInt(groupsLimitAttr, 10);
+
+                treeAttr.noOpen = archParseBoolean(node.getAttribute("no_open") || "");
+                treeAttr.rawExpand = xmlDoc.getAttribute("expand");
+                treeAttr.decorations = getDecoration(xmlDoc);
+
+                // custom open action when clicking on record row
+                const action = xmlDoc.getAttribute("action");
+                const type = xmlDoc.getAttribute("type");
+                treeAttr.openAction = action && type ? { action, type } : null;
+            }
+        });
+
+        if (!defaultOrder.length && handleField) {
+            defaultOrder = stringToOrderBy(handleField);
+        }
+
+        for (const [key, field] of Object.entries(fieldNodes)) {
+            activeFields[key] = field; // TODO process
+        }
+
+        return {
+            creates,
+            handleField,
+            headerButtons,
+            fieldNodes,
+            activeFields,
+            columns,
+            groupBy,
+            defaultOrder,
+            __rawArch: arch,
+            ...treeAttr,
+        };
+    }
+}
+
+```
+
+  </TabItem>
+  <TabItem value="list_controller_js" label="list_controller.js">
+
+```javascript title="list_controller.js">
+/** @odoo-module */
+
+import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import { download } from "@web/core/network/download";
+import { evaluateExpr } from "@web/core/py_js/py";
+import { DynamicRecordList } from "@web/views/relational_model";
+import { unique } from "@web/core/utils/arrays";
+import { useService } from "@web/core/utils/hooks";
+import { sprintf } from "@web/core/utils/strings";
+import { ActionMenus } from "@web/search/action_menus/action_menus";
+import { Layout } from "@web/search/layout";
+import { usePager } from "@web/search/pager_hook";
+import { session } from "@web/session";
+import { useModel } from "@web/views/model";
+import { standardViewProps } from "@web/views/standard_view_props";
+import { useSetupView } from "@web/views/view_hook";
+import { ViewButton } from "@web/views/view_button/view_button";
+import { useViewButtons } from "@web/views/view_button/view_button_hook";
+import { ExportDataDialog } from "@web/views/view_dialogs/export_data_dialog";
+
+import { Component, onWillStart, useSubEnv, useEffect, useRef } from "@odoo/owl";
+
+export class ListViewHeaderButton extends ViewButton {
+    async onClick() {
+        const { clickParams, list } = this.props;
+        const resIds = await list.getResIds(true);
+        clickParams.buttonContext = {
+            active_domain: this.props.domain,
+            // active_id: resIds[0], // FGE TODO
+            active_ids: resIds,
+            active_model: list.resModel,
+        };
+
+        this.env.onClickViewButton({
+            clickParams,
+            getResParams: () => ({
+                context: list.context,
+                evalContext: list.evalContext,
+                resModel: list.resModel,
+                resIds,
+            }),
+        });
+    }
+}
+ListViewHeaderButton.props = [...ViewButton.props, "list", "domain"];
+
+// -----------------------------------------------------------------------------
+
+export class ListController extends Component {
+    setup() {
+        this.actionService = useService("action");
+        this.dialogService = useService("dialog");
+        this.notificationService = useService("notification");
+        this.userService = useService("user");
+        this.rpc = useService("rpc");
+        this.rootRef = useRef("root");
+
+        this.archInfo = this.props.archInfo;
+        this.editable = this.props.editable ? this.archInfo.editable : false;
+        this.multiEdit = this.archInfo.multiEdit;
+        this.activeActions = this.archInfo.activeActions;
+        const fields = this.props.fields;
+        const { rootState } = this.props.state || {};
+        const { rawExpand } = this.archInfo;
+        this.model = useModel(this.props.Model, {
+            resModel: this.props.resModel,
+            fields,
+            activeFields: this.archInfo.activeFields,
+            fieldNodes: this.archInfo.fieldNodes,
+            handleField: this.archInfo.handleField,
+            viewMode: "list",
+            groupByInfo: this.archInfo.groupBy.fields,
+            limit: this.archInfo.limit || this.props.limit,
+            countLimit: this.archInfo.countLimit,
+            defaultOrder: this.archInfo.defaultOrder,
+            expand: rawExpand ? evaluateExpr(rawExpand, this.props.context) : false,
+            groupsLimit: this.archInfo.groupsLimit,
+            multiEdit: this.multiEdit,
+            rootState,
+        });
+
+        this.optionalActiveFields = [];
+
+        onWillStart(async () => {
+            this.isExportEnable = await this.userService.hasGroup("base.group_allow_export");
+        });
+
+        this.archiveEnabled =
+            "active" in fields
+                ? !fields.active.readonly
+                : "x_active" in fields
+                ? !fields.x_active.readonly
+                : false;
+        useSubEnv({ model: this.model}); // do this in useModel?
+        useViewButtons(this.model, this.rootRef, {
+            beforeExecuteAction: this.beforeExecuteActionButton.bind(this),
+            afterExecuteAction: this.afterExecuteActionButton.bind(this),
+        });
+        useSetupView({
+            rootRef: this.rootRef,
+            beforeLeave: async () => {
+                const list = this.model.root;
+                const editedRecord = list.editedRecord;
+                console.log('List Controller beforeLeave');
+                if (editedRecord) {
+                    if (!(await list.unselectRecord(true))) {
+                        return false;
+                    }
+                }
+            },
+            beforeUnload: async (ev) => {
+                const editedRecord = this.model.root.editedRecord;
+                if (editedRecord) {
+                    const isValid = await editedRecord.urgentSave();
+                    if (!isValid) {
+                        ev.preventDefault();
+                        ev.returnValue = "Unsaved changes";
+                    }
+                }
+            },
+            getLocalState: () => {
+                return {
+                    rootState: this.model.root.exportState(),
+                };
+            },
+            getOrderBy: () => {
+                return this.model.root.orderBy;
+            },
+        });
+
+        usePager(() => {
+            const list = this.model.root;
+            const { count, hasLimitedCount, isGrouped, limit, offset } = list;
+            return {
+                offset: offset,
+                limit: limit,
+                total: count,
+                onUpdate: async ({ offset, limit }, hasNavigated) => {
+                    if (this.model.root.editedRecord) {
+                        if (!(await this.model.root.editedRecord.save())) {
+                            return;
+                        }
+                    }
+                    await list.load({ limit, offset });
+                    this.render(true); // FIXME WOWL reactivity
+                    if (hasNavigated) {
+                        this.onPageChangeScroll();
+                    }
+                },
+                updateTotal: !isGrouped && hasLimitedCount ? () => list.fetchCount() : undefined,
+            };
+        });
+
+        useEffect(
+            () => {
+                if (this.props.onSelectionChanged) {
+                    const resIds = this.model.root.selection.map((record) => record.resId);
+                    this.props.onSelectionChanged(resIds);
+                }
+            },
+            () => [this.model.root.selection.length]
+        );
+    }
+
+    async createRecord({ group } = {}) {
+        const list = (group && group.list) || this.model.root;
+        if (this.editable && !list.isGrouped) {
+            if (!(list instanceof DynamicRecordList)) {
+                throw new Error("List should be a DynamicRecordList");
+            }
+            if (list.editedRecord) {
+                await list.editedRecord.save();
+            }
+            if (!list.editedRecord) {
+                await (group || list).createRecord({}, this.editable === "top");
+            }
+            this.render();
+        } else {
+            await this.props.createRecord();
+        }
+    }
+
+    async openRecord(record) {
+        if (this.archInfo.openAction) {
+            this.actionService.doActionButton({
+                name: this.archInfo.openAction.action,
+                type: this.archInfo.openAction.type,
+                resModel: record.resModel,
+                resId: record.resId,
+                resIds: record.resIds,
+                context: record.context,
+                onClose: async () => {
+                    await record.model.root.load();
+                    record.model.notify();
+                },
+            });
+        } else {
+            const activeIds = this.model.root.records.map((datapoint) => datapoint.resId);
+            this.props.selectRecord(record.resId, { activeIds });
+        }
+    }
+
+    onClickCreate() {
+        this.createRecord();
+    }
+
+    onClickDiscard() {
+        const editedRecord = this.model.root.editedRecord;
+        if (editedRecord.isVirtual) {
+            this.model.root.removeRecord(editedRecord);
+        } else {
+            editedRecord.discard();
+        }
+    }
+
+    onClickSave() {
+        this.model.root.editedRecord.save();
+    }
+
+    onMouseDownDiscard(mouseDownEvent) {
+        const list = this.model.root;
+        list.blockUpdate = true;
+        document.addEventListener(
+            "mouseup",
+            (mouseUpEvent) => {
+                if (mouseUpEvent.target !== mouseDownEvent.target) {
+                    list.blockUpdate = false;
+                    list.multiSave(list.editedRecord);
+                }
+            },
+            { capture: true, once: true }
+        );
+    }
+
+    onPageChangeScroll() {
+        if (this.rootRef && this.rootRef.el) {
+            this.rootRef.el.querySelector(".o_content").scrollTop = 0;
+        }
+    }
+
+    getSelectedResIds() {
+        return this.model.root.getResIds(true);
+    }
+
+    getActionMenuItems() {
+        const isM2MGrouped = this.model.root.isM2MGrouped;
+        const otherActionItems = [];
+        if (this.isExportEnable) {
+            otherActionItems.push({
+                key: "export",
+                description: this.env._t("Export"),
+                callback: () => this.onExportData(),
+            });
+        }
+        if (this.archiveEnabled && !isM2MGrouped) {
+            otherActionItems.push({
+                key: "archive",
+                description: this.env._t("Archive"),
+                callback: () => {
+                    const dialogProps = {
+                        body: this.env._t(
+                            "Are you sure that you want to archive all the selected records?"
+                        ),
+                        confirmLabel: this.env._t("Archive"),
+                        confirm: () => {
+                            this.toggleArchiveState(true);
+                        },
+                        cancel: () => {},
+                    };
+                    this.dialogService.add(ConfirmationDialog, dialogProps);
+                },
+            });
+            otherActionItems.push({
+                key: "unarchive",
+                description: this.env._t("Unarchive"),
+                callback: () => this.toggleArchiveState(false),
+            });
+        }
+        if (this.activeActions.delete && !isM2MGrouped) {
+            otherActionItems.push({
+                key: "delete",
+                description: this.env._t("Delete"),
+                callback: () => this.onDeleteSelectedRecords(),
+            });
+        }
+        return Object.assign({}, this.props.info.actionMenus, { other: otherActionItems });
+    }
+
+    async onSelectDomain() {
+        this.model.root.selectDomain(true);
+        if (this.props.onSelectionChanged) {
+            const resIds = await this.model.root.getResIds(true);
+            this.props.onSelectionChanged(resIds);
+        }
+    }
+
+    get className() {
+        return this.props.className;
+    }
+
+    get nbSelected() {
+        return this.model.root.selection.length;
+    }
+
+    get isPageSelected() {
+        const root = this.model.root;
+        return root.selection.length === root.records.length;
+    }
+
+    get isDomainSelected() {
+        return this.model.root.isDomainSelected;
+    }
+
+    get nbTotal() {
+        const list = this.model.root;
+        return list.isGrouped ? list.nbTotalRecords : list.count;
+    }
+
+    onOptionalFieldsChanged(optionalActiveFields) {
+        this.optionalActiveFields = optionalActiveFields;
+    }
+
+    get defaultExportList() {
+        return unique(
+            this.props.archInfo.columns
+                .filter((col) => col.type === "field")
+                .filter((col) => !col.optional || this.optionalActiveFields[col.name])
+                .map((col) => this.props.fields[col.name])
+                .filter((field) => field.exportable !== false)
+        );
+    }
+
+    get display() {
+        if (!this.env.isSmall) {
+            return this.props.display;
+        }
+        const { controlPanel } = this.props.display;
+        return {
+            ...this.props.display,
+            controlPanel: {
+                ...controlPanel,
+                "bottom-right": !this.nbSelected,
+            },
+        };
+    }
+
+    async downloadExport(fields, import_compat, format) {
+        let ids = false;
+        if (!this.isDomainSelected) {
+            const resIds = await this.getSelectedResIds();
+            ids = resIds.length > 0 && resIds;
+        }
+        const exportedFields = fields.map((field) => ({
+            name: field.name || field.id,
+            label: field.label || field.string,
+            store: field.store,
+            type: field.field_type || field.type,
+        }));
+        if (import_compat) {
+            exportedFields.unshift({ name: "id", label: this.env._t("External ID") });
+        }
+        await download({
+            data: {
+                data: JSON.stringify({
+                    import_compat,
+                    context: this.props.context,
+                    domain: this.model.root.domain,
+                    fields: exportedFields,
+                    groupby: this.model.root.groupBy,
+                    ids,
+                    model: this.model.root.resModel,
+                }),
+            },
+            url: `/web/export/${format}`,
+        });
+    }
+
+    async getExportedFields(model, import_compat, parentParams) {
+        return await this.rpc("/web/export/get_fields", {
+            ...parentParams,
+            model,
+            import_compat,
+        });
+    }
+
+    /**
+     * Opens the Export Dialog
+     *
+     * @private
+     */
+    async onExportData() {
+        const dialogProps = {
+            context: this.props.context,
+            defaultExportList: this.defaultExportList,
+            download: this.downloadExport.bind(this),
+            getExportedFields: this.getExportedFields.bind(this),
+            root: this.model.root,
+        };
+        this.dialogService.add(ExportDataDialog, dialogProps);
+    }
+    /**
+     * Export Records in a xls file
+     *
+     * @private
+     */
+    async onDirectExportData() {
+        await this.downloadExport(this.defaultExportList, false, "xlsx");
+    }
+    /**
+     * Called when clicking on 'Archive' or 'Unarchive' in the sidebar.
+     *
+     * @private
+     * @param {boolean} archive
+     * @returns {Promise}
+     */
+    async toggleArchiveState(archive) {
+        let resIds;
+        const isDomainSelected = this.model.root.isDomainSelected;
+        const total = this.model.root.count;
+        if (archive) {
+            resIds = await this.model.root.archive(true);
+        } else {
+            resIds = await this.model.root.unarchive(true);
+        }
+        if (
+            isDomainSelected &&
+            resIds.length === session.active_ids_limit &&
+            resIds.length < total
+        ) {
+            this.notificationService.add(
+                sprintf(
+                    this.env._t(
+                        "Of the %d records selected, only the first %d have been archived/unarchived."
+                    ),
+                    resIds.length,
+                    total
+                ),
+                { title: this.env._t("Warning") }
+            );
+        }
+    }
+
+    get deleteConfirmationDialogProps() {
+        const root = this.model.root;
+        const body =
+            root.isDomainSelected || root.selection.length > 1
+                ? this.env._t("Are you sure you want to delete these records?")
+                : this.env._t("Are you sure you want to delete this record?");
+        return {
+            body,
+            confirm: async () => {
+                const total = root.count;
+                const resIds = await this.model.root.deleteRecords();
+                this.model.notify();
+                if (
+                    root.isDomainSelected &&
+                    resIds.length === session.active_ids_limit &&
+                    resIds.length < total
+                ) {
+                    this.notificationService.add(
+                        sprintf(
+                            this.env._t(
+                                `Only the first %s records have been deleted (out of %s selected)`
+                            ),
+                            resIds.length,
+                            total
+                        ),
+                        { title: this.env._t("Warning") }
+                    );
+                }
+            },
+            cancel: () => {},
+        };
+    }
+
+    async onDeleteSelectedRecords() {
+        this.dialogService.add(ConfirmationDialog, this.deleteConfirmationDialogProps);
+    }
+
+    discardSelection() {
+        this.model.root.records.forEach((record) => {
+            record.toggleSelection(false);
+        });
+    }
+
+    async beforeExecuteActionButton(clickParams) {
+        if (clickParams.special !== "cancel" && this.model.root.editedRecord) {
+            return this.model.root.editedRecord.save();
+        }
+    }
+
+    async afterExecuteActionButton(clickParams) {}
+}
+
+ListController.template = `web.ListView`;
+ListController.components = { ActionMenus, ListViewHeaderButton, Layout, ViewButton };
+ListController.props = {
+    ...standardViewProps,
+    allowSelectors: { type: Boolean, optional: true },
+    editable: { type: Boolean, optional: true },
+    onSelectionChanged: { type: Function, optional: true },
+    showButtons: { type: Boolean, optional: true },
+    Model: Function,
+    Renderer: Function,
+    buttonTemplate: String,
+    archInfo: Object,
+};
+ListController.defaultProps = {
+    allowSelectors: true,
+    createRecord: () => {},
+    editable: true,
+    selectRecord: () => {},
+    showButtons: true,
+};
+
+```
+
+  </TabItem>
+  <TabItem value="list_controller_xml" label="list_controller.xml">
+
+```xml title="list_controller.xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="web.ListView" owl="1">
+        <div t-att-class="className" t-ref="root">
+            <Layout className="model.useSampleModel ? 'o_view_sample_data' : ''" display="display">
+                <t t-set-slot="layout-buttons">
+                    <t t-if="env.isSmall and nbSelected">
+                        <t t-call="web.ListView.Selection" />
+                    </t>
+                    <t t-else="">
+                        <div class="o_cp_buttons" role="toolbar" aria-label="Control panel buttons" t-ref="buttons">
+                            <t t-call="{{ props.buttonTemplate }}"/>
+                        </div>
+                    </t>
+                </t>
+                <t t-set-slot="control-panel-bottom-left">
+                    <t t-if="props.info.actionMenus and model.root.selection.length">
+                        <ActionMenus
+                            getActiveIds="() => model.root.selection.map((r) => r.resId)"
+                            context="props.context"
+                            domain="props.domain"
+                            items="getActionMenuItems()"
+                            isDomainSelected="model.root.isDomainSelected"
+                            resModel="model.root.resModel"
+                            onActionExecuted="() => model.load()"/>
+                    </t>
+                </t>
+                <t t-component="props.Renderer" list="model.root" activeActions="activeActions" archInfo="archInfo" allowSelectors="props.allowSelectors" editable="editable" openRecord.bind="openRecord" noContentHelp="props.info.noContentHelp" onAdd.bind="createRecord" onOptionalFieldsChanged.bind="onOptionalFieldsChanged"/>
+            </Layout>
+        </div>
+    </t>
+
+    <t t-name="web.ListView.Buttons" owl="1">
+        <div class="o_list_buttons d-flex" role="toolbar" aria-label="Main actions">
+            <t t-if="props.showButtons">
+                <t t-if="model.root.editedRecord">
+                    <button type="button" class="btn btn-primary o_list_button_save" data-hotkey="s" t-on-click.stop="onClickSave">
+                        Save
+                    </button>
+                    <button type="button" class="btn btn-secondary o_list_button_discard" data-hotkey="j" t-on-click="onClickDiscard" t-on-mousedown="onMouseDownDiscard">
+                        Discard
+                    </button>
+                </t>
+                <t t-elif="activeActions.create">
+                    <button type="button" class="btn btn-primary o_list_button_add" data-hotkey="c" t-on-click="onClickCreate" data-bounce-button="">
+                        New
+                    </button>
+                </t>
+                <t t-if="nbTotal and !nbSelected and activeActions.exportXlsx and isExportEnable and !env.isSmall">
+                    <button type="button" class="btn btn-secondary fa fa-download o_list_export_xlsx" data-tooltip="Export All" aria-label="Export All" t-on-click="onDirectExportData"/>
+                </t>
+            </t>
+            <t t-if="nbSelected">
+                <t t-foreach="archInfo.headerButtons" t-as="button" t-key="button.id">
+                    <ListViewHeaderButton
+                        list="model.root"
+                        clickParams="button.clickParams"
+                        defaultRank="button.defaultRank"
+                        domain="props.domain"
+                        icon="button.icon"
+                        string="button.string"
+                        title="button.title"
+                    />
+                </t>
+                <t t-if="!env.isSmall">
+                    <t t-call="web.ListView.Selection"/>
+                </t>
+            </t>
+        </div>
+    </t>
+
+    <t t-name="web.ListView.Selection" owl="1">
+        <div class="o_list_selection_box alert alert-info d-inline-flex align-items-center ps-0 px-lg-2 py-0 mb-0 ms-0 ms-md-2" role="alert">
+            <t t-if="env.isSmall">
+                <button class="btn btn-link py-0 o_discard_selection" t-on-click="discardSelection">
+                    <span class="fa-2x">&#215;</span>
+                </button>
+            </t>
+            <span t-if="isDomainSelected">All <span class="font-monospace" t-esc="nbTotal"/> selected</span>
+            <t t-else="">
+                <span class="font-monospace me-1" t-esc="nbSelected"/> selected
+                <a t-if="isPageSelected and nbTotal > nbSelected" href="#" class="o_list_select_domain ms-2 btn btn-sm btn-info px-2 py-1 border-0 fw-normal" t-on-click="onSelectDomain">
+                    <i class="fa fa-arrow-right"/> Select all <span class="font-monospace" t-esc="nbTotal"/>
+                </a>
+            </t>
+        </div>
+    </t>
+
+</templates>
+
+```
+
+  </TabItem>
+  <TabItem value="list_renderer_js" label="list_renderer.js">
+
+```javascript
+/** @odoo-module **/
+
+import { browser } from "@web/core/browser/browser";
+import { CheckBox } from "@web/core/checkbox/checkbox";
+import { Dropdown } from "@web/core/dropdown/dropdown";
+import { DropdownItem } from "@web/core/dropdown/dropdown_item";
+import { getActiveHotkey } from "@web/core/hotkeys/hotkey_service";
+import { Pager } from "@web/core/pager/pager";
+import { evaluateExpr } from "@web/core/py_js/py";
+import { registry } from "@web/core/registry";
+import { useBus, useService } from "@web/core/utils/hooks";
+import { useSortable } from "@web/core/utils/sortable";
+import { getTabableElements } from "@web/core/utils/ui";
+import { Field } from "@web/views/fields/field";
+import { getTooltipInfo } from "@web/views/fields/field_tooltip";
+import { evalDomain, getClassNameFromDecoration } from "@web/views/utils";
+import { ViewButton } from "@web/views/view_button/view_button";
+import { useBounceButton } from "@web/views/view_hook";
+import { Widget } from "@web/views/widgets/widget";
+import { getFormattedValue } from "../utils";
+import { localization } from "@web/core/l10n/localization";
+
+import {
+    Component,
+    onMounted,
+    onPatched,
+    onWillPatch,
+    onWillUpdateProps,
+    useExternalListener,
+    useRef,
+    useState,
+    useEffect,
+} from "@odoo/owl";
+import { _t } from "@web/core/l10n/translation";
+
+const formatters = registry.category("formatters");
+
+const DEFAULT_GROUP_PAGER_COLSPAN = 1;
+
+const FIELD_CLASSES = {
+    char: "o_list_char",
+    float: "o_list_number",
+    integer: "o_list_number",
+    monetary: "o_list_number",
+    text: "o_list_text",
+    many2one: "o_list_many2one",
+};
+
+const FIXED_FIELD_COLUMN_WIDTHS = {
+    boolean: "70px",
+    date: "92px",
+    datetime: "146px",
+    float: "92px",
+    integer: "74px",
+    monetary: "104px",
+    handle: "33px",
+};
+
+/**
+ * @param {HTMLElement} parent
+ */
+function containsActiveElement(parent) {
+    const { activeElement } = document;
+    return parent !== activeElement && parent.contains(activeElement);
+}
+
+function getElementToFocus(cell) {
+    return getTabableElements(cell)[0] || cell;
+}
+
+export class ListRenderer extends Component {
+    setup() {
+        this.uiService = useService("ui");
+        this.notificationService = useService("notification");
+        this.allColumns = this.props.archInfo.columns;
+        this.keyOptionalFields = this.createKeyOptionalFields();
+        this.getOptionalActiveFields();
+        this.cellClassByColumn = {};
+        this.groupByButtons = this.props.archInfo.groupBy.buttons;
+        this.state = useState({
+            columns: this.getActiveColumns(this.props.list),
+        });
+        this.withHandleColumn = this.state.columns.some((col) => col.widget === "handle");
+        useExternalListener(document, "click", this.onGlobalClick.bind(this));
+        this.tableRef = useRef("table");
+
+        this.longTouchTimer = null;
+        this.touchStartMs = 0;
+
+        /**
+         * When resizing, it's possible that the pointer is not above the resize
+         * handle (by some few pixel difference). During this scenario, click event
+         * will be triggered on the column title which will reorder the column.
+         * Column resize that triggers a reorder is not a good UX and we prevent this
+         * using the following state variables: `resizing` and `preventReorder` which
+         * are set during the column's click (onClickSortColumn), mouseup
+         * (onColumnTitleMouseUp) and onStartResize events.
+         */
+        this.resizing = false;
+        this.preventReorder = false;
+
+        this.creates = this.props.archInfo.creates.length
+            ? this.props.archInfo.creates
+            : [{ type: "create", string: this.env._t("Add a line") }];
+
+        this.cellToFocus = null;
+        this.activeRowId = null;
+        onMounted(() => {
+            this.activeElement = this.uiService.activeElement;
+        });
+        onWillPatch(() => {
+            const activeRow = document.activeElement.closest(".o_data_row.o_selected_row");
+            this.activeRowId = activeRow ? activeRow.dataset.id : null;
+        });
+        onWillUpdateProps((nextProps) => {
+            this.allColumns = nextProps.archInfo.columns;
+            this.state.columns = this.getActiveColumns(nextProps.list);
+        });
+        let dataRowId;
+        this.rootRef = useRef("root");
+        this.resequencePromise = Promise.resolve();
+        useSortable({
+            enable: () => this.canResequenceRows,
+            // Params
+            ref: this.rootRef,
+            elements: ".o_row_draggable",
+            handle: ".o_handle_cell",
+            cursor: "grabbing",
+            // Hooks
+            onDragStart: (params) => {
+                const { element } = params;
+                dataRowId = element.dataset.id;
+                return this.sortStart(params);
+            },
+            onDragEnd: (params) => this.sortStop(params),
+            onDrop: (params) => this.sortDrop(dataRowId, params),
+        });
+
+        if (this.env.searchModel) {
+            useBus(this.env.searchModel, "focus-view", () => {
+                if (this.props.list.model.useSampleModel) {
+                    return;
+                }
+
+                const nextTh = this.tableRef.el.querySelector("thead th");
+                const toFocus = getElementToFocus(nextTh);
+                this.focus(toFocus);
+                this.tableRef.el.querySelector("tbody").classList.add("o_keyboard_navigation");
+            });
+        }
+
+        // not very beautiful but works: refactor at some point
+        let lastCellBeforeDialogOpening;
+        useBus(this.props.list.model, "list-confirmation-dialog-will-open", () => {
+            if (this.tableRef.el.contains(document.activeElement)) {
+                lastCellBeforeDialogOpening = document.activeElement.closest("td");
+            }
+        });
+
+        useBus(this.props.list.model, "list-confirmation-dialog-closed", () => {
+            if (lastCellBeforeDialogOpening) {
+                this.focus(lastCellBeforeDialogOpening);
+            }
+        });
+
+        useBounceButton(this.rootRef, () => {
+            return this.showNoContentHelper;
+        });
+        useEffect(
+            (editedRecord) => {
+                if (editedRecord) {
+                    this.keepColumnWidths = true;
+                }
+            },
+            () => [this.props.list.editedRecord]
+        );
+        useEffect(
+            () => {
+                this.freezeColumnWidths();
+            },
+            () => [this.state.columns, this.isEmpty]
+        );
+        useExternalListener(window, "resize", () => {
+            this.columnWidths = null;
+            this.freezeColumnWidths();
+        });
+        onPatched(() => {
+            const editedRecord = this.props.list.editedRecord;
+            if (editedRecord && this.activeRowId !== editedRecord.id) {
+                if (this.cellToFocus && this.cellToFocus.record === editedRecord) {
+                    const column = this.cellToFocus.column;
+                    const forward = this.cellToFocus.forward;
+                    this.focusCell(column, forward);
+                } else if (this.lastEditedCell) {
+                    this.focusCell(this.lastEditedCell.column, true);
+                } else {
+                    this.focusCell(this.state.columns[0]);
+                }
+            }
+            this.cellToFocus = null;
+            this.lastEditedCell = null;
+        });
+        this.isRTL = localization.direction === "rtl";
+    }
+
+    displaySaveNotification() {
+        this.notificationService.add(this.env._t('Please click on the "save" button first'), {
+            type: "danger",
+        });
+    }
+
+    getActiveColumns(list) {
+        return this.allColumns.filter((col) => {
+            if (list.isGrouped && col.widget === "handle") {
+                return false; // no handle column if the list is grouped
+            }
+            return !col.optional || this.optionalActiveFields[col.name];
+        });
+    }
+
+    get hasSelectors() {
+        return this.props.allowSelectors && !this.env.isSmall;
+    }
+
+    add(params) {
+        if (this.canCreate) {
+            this.props.onAdd(params);
+        }
+    }
+
+    // The following code manipulates the DOM directly to avoid having to wait for a
+    // render + patch which would occur on the next frame and cause flickering.
+    freezeColumnWidths() {
+        if (!this.keepColumnWidths) {
+            this.columnWidths = null;
+        }
+
+        const table = this.tableRef.el;
+        const headers = [...table.querySelectorAll("thead th:not(.o_list_actions_header)")];
+
+        if (!this.columnWidths || !this.columnWidths.length) {
+            // no column widths to restore
+
+            table.style.tableLayout = "fixed";
+            const allowedWidth = table.parentNode.getBoundingClientRect().width;
+            // Set table layout auto and remove inline style to make sure that css
+            // rules apply (e.g. fixed width of record selector)
+            table.style.tableLayout = "auto";
+            headers.forEach((th) => {
+                th.style.width = null;
+                th.style.maxWidth = null;
+            });
+
+            this.setDefaultColumnWidths();
+
+            // Squeeze the table by applying a max-width on largest columns to
+            // ensure that it doesn't overflow
+            this.columnWidths = this.computeColumnWidthsFromContent(allowedWidth);
+            table.style.tableLayout = "fixed";
+        }
+        headers.forEach((th, index) => {
+            if (!th.style.width) {
+                th.style.width = `${Math.floor(this.columnWidths[index])}px`;
+            }
+        });
+    }
+
+    setDefaultColumnWidths() {
+        const widths = this.state.columns.map((col) => this.calculateColumnWidth(col));
+        const sumOfRelativeWidths = widths
+            .filter(({ type }) => type === "relative")
+            .reduce((sum, { value }) => sum + value, 0);
+
+        // 1 because nth-child selectors are 1-indexed, 2 when the first column contains
+        // the checkboxes to select records.
+        const columnOffset = this.hasSelectors ? 2 : 1;
+        widths.forEach(({ type, value }, i) => {
+            const headerEl = this.tableRef.el.querySelector(`th:nth-child(${i + columnOffset})`);
+            if (type === "absolute") {
+                if (this.isEmpty) {
+                    headerEl.style.width = value;
+                } else {
+                    headerEl.style.minWidth = value;
+                }
+            } else if (type === "relative" && this.isEmpty) {
+                headerEl.style.width = `${((value / sumOfRelativeWidths) * 100).toFixed(2)}%`;
+            }
+        });
+    }
+
+    computeColumnWidthsFromContent(allowedWidth) {
+        const table = this.tableRef.el;
+
+        // Toggle a className used to remove style that could interfere with the ideal width
+        // computation algorithm (e.g. prevent text fields from being wrapped during the
+        // computation, to prevent them from being completely crushed)
+        table.classList.add("o_list_computing_widths");
+
+        const headers = [...table.querySelectorAll("thead th")];
+        const columnWidths = headers.map((th) => th.getBoundingClientRect().width);
+        const getWidth = (th) => columnWidths[headers.indexOf(th)] || 0;
+        const getTotalWidth = () => columnWidths.reduce((tot, width) => tot + width, 0);
+        const shrinkColumns = (thsToShrink, shrinkAmount) => {
+            let canKeepShrinking = true;
+            for (const th of thsToShrink) {
+                const index = headers.indexOf(th);
+                let maxWidth = columnWidths[index] - shrinkAmount;
+                // prevent the columns from shrinking under 92px (~ date field)
+                if (maxWidth < 92) {
+                    maxWidth = 92;
+                    canKeepShrinking = false;
+                }
+                th.style.maxWidth = `${Math.floor(maxWidth)}px`;
+                columnWidths[index] = maxWidth;
+            }
+            return canKeepShrinking;
+        };
+        // Sort columns, largest first
+        const sortedThs = [...table.querySelectorAll("thead th:not(.o_list_button)")].sort(
+            (a, b) => getWidth(b) - getWidth(a)
+        );
+
+        let totalWidth = getTotalWidth();
+        for (let index = 1; totalWidth > allowedWidth; index++) {
+            // Find the largest columns
+            const largestCols = sortedThs.slice(0, index);
+            const currentWidth = getWidth(largestCols[0]);
+            for (; currentWidth === getWidth(sortedThs[index]); index++) {
+                largestCols.push(sortedThs[index]);
+            }
+
+            // Compute the number of px to remove from the largest columns
+            const nextLargest = sortedThs[index];
+            const toRemove = Math.ceil((totalWidth - allowedWidth) / largestCols.length);
+            const shrinkAmount = Math.min(toRemove, currentWidth - getWidth(nextLargest));
+
+            // Shrink the largest columns
+            const canKeepShrinking = shrinkColumns(largestCols, shrinkAmount);
+            if (!canKeepShrinking) {
+                break;
+            }
+
+            totalWidth = getTotalWidth();
+        }
+
+        // We are no longer computing widths, so restore the normal style
+        table.classList.remove("o_list_computing_widths");
+        return columnWidths;
+    }
+
+    get activeActions() {
+        return this.props.activeActions || {};
+    }
+
+    get canResequenceRows() {
+        if (!this.props.list.canResequence() || this.props.readonly) {
+            return false;
+        }
+        const orderBy = this.props.list.orderBy;
+        const handleField = this.props.archInfo.handleField;
+        return !orderBy.length || (orderBy.length && orderBy[0].name === handleField);
+    }
+
+    /**
+     * No records, no groups.
+     */
+    get isEmpty() {
+        return !this.props.list.records.length;
+    }
+
+    get fields() {
+        return this.props.list.fields;
+    }
+
+    get nbCols() {
+        let nbCols = this.state.columns.length;
+        if (this.hasSelectors) {
+            nbCols++;
+        }
+        if (this.activeActions.onDelete || this.displayOptionalFields) {
+            nbCols++;
+        }
+        return nbCols;
+    }
+
+    canUseFormatter(column, record) {
+        return !record.isInEdition && !column.widget;
+    }
+
+    focusCell(column, forward = true) {
+        const index = this.state.columns.indexOf(column);
+        let columns;
+        if (index === -1 && !forward) {
+            columns = this.state.columns.slice(0).reverse();
+        } else {
+            columns = [
+                ...this.state.columns.slice(index, this.state.columns.length),
+                ...this.state.columns.slice(0, index),
+            ];
+        }
+        const editedRecord = this.props.list.editedRecord;
+        for (const column of columns) {
+            if (column.type !== "field") {
+                continue;
+            }
+            const fieldName = column.name;
+            // in findNextFocusableOnRow test is done by using classList
+            // refactor
+            if (!editedRecord.isReadonly(fieldName)) {
+                const cell = this.tableRef.el.querySelector(
+                    `.o_selected_row td[name=${fieldName}]`
+                );
+                if (cell) {
+                    const toFocus = getElementToFocus(cell);
+                    if (cell !== toFocus) {
+                        this.focus(toFocus);
+                        this.lastEditedCell = { column, record: editedRecord };
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    focus(el) {
+        el.focus();
+        if (["INPUT", "TEXTAREA"].includes(el.tagName)) {
+            if (el.selectionStart === null) {
+                return;
+            }
+            if (el.selectionStart === el.selectionEnd) {
+                el.selectionStart = 0;
+                el.selectionEnd = el.value.length;
+            }
+        }
+    }
+
+    editGroupRecord(group) {
+        const { resId, resModel } = group.record;
+        this.env.services.action.doAction({
+            context: {
+                create: false,
+            },
+            res_model: resModel,
+            res_id: resId,
+            type: "ir.actions.act_window",
+            views: [[false, "form"]],
+            flags: { mode: "edit" },
+        });
+    }
+
+    createKeyOptionalFields() {
+        let keyParts = {
+            fields: this.props.list.fieldNames,
+            model: this.props.list.resModel,
+            viewMode: "list",
+            viewId: this.env.config.viewId,
+        };
+
+        if (this.props.nestedKeyOptionalFieldsData) {
+            keyParts = Object.assign(keyParts, {
+                model: this.props.nestedKeyOptionalFieldsData.model,
+                viewMode: this.props.nestedKeyOptionalFieldsData.viewMode,
+                relationalField: this.props.nestedKeyOptionalFieldsData.field,
+                subViewType: "list",
+            });
+        }
+
+        const parts = ["model", "viewMode", "viewId", "relationalField", "subViewType"];
+        const viewIdentifier = ["optional_fields"];
+        parts.forEach((partName) => {
+            if (partName in keyParts) {
+                viewIdentifier.push(keyParts[partName]);
+            }
+        });
+        keyParts.fields
+            .sort((left, right) => (left < right ? -1 : 1))
+            .forEach((fieldName) => {
+                return viewIdentifier.push(fieldName);
+            });
+        return viewIdentifier.join(",");
+    }
+
+    get getOptionalFields() {
+        return this.allColumns
+            .filter((col) => col.optional)
+            .map((col) => ({
+                label: col.label,
+                name: col.name,
+                value: this.optionalActiveFields[col.name],
+            }));
+    }
+
+    get displayOptionalFields() {
+        return this.getOptionalFields.length;
+    }
+
+    nbRecordsInGroup(group) {
+        if (group.isFolded) {
+            return 0;
+        } else if (group.list.isGrouped) {
+            let count = 0;
+            for (const gr of group.list.groups) {
+                count += this.nbRecordsInGroup(gr);
+            }
+            return count;
+        } else {
+            return group.list.records.length;
+        }
+    }
+    get selectAll() {
+        const list = this.props.list;
+        const nbDisplayedRecords = list.records.length;
+        if (list.isDomainSelected) {
+            return true;
+        } else {
+            return nbDisplayedRecords > 0 && list.selection.length === nbDisplayedRecords;
+        }
+    }
+
+    get aggregates() {
+        let values;
+        if (this.props.list.selection && this.props.list.selection.length) {
+            values = this.props.list.selection.map((r) => r.data);
+        } else if (this.props.list.isGrouped) {
+            values = this.props.list.groups.map((g) => g.aggregates);
+        } else {
+            values = this.props.list.records.map((r) => r.data);
+        }
+        const aggregates = {};
+        for (const fieldName in this.props.list.activeFields) {
+            const field = this.fields[fieldName];
+            const fieldValues = values.map((v) => v[fieldName]).filter((v) => v || v === 0);
+            if (!fieldValues.length) {
+                continue;
+            }
+            const type = field.type;
+            if (type !== "integer" && type !== "float" && type !== "monetary") {
+                continue;
+            }
+            const { rawAttrs, widget } = this.props.list.activeFields[fieldName];
+            let currencyId;
+            if (type === "monetary" || widget === "monetary") {
+                const currencyField =
+                    this.props.list.activeFields[fieldName].options.currency_field ||
+                    this.fields[fieldName].currency_field ||
+                    "currency_id";
+                currencyId =
+                    currencyField in this.props.list.activeFields &&
+                    values[0][currencyField] &&
+                    values[0][currencyField][0];
+                if (currencyId) {
+                    const sameCurrency = values.every(
+                        (value) => currencyId === value[currencyField][0]
+                    );
+                    if (!sameCurrency) {
+                        aggregates[fieldName] = {
+                            help: _t("Different currencies cannot be aggregated"),
+                            value: "—",
+                        };
+                        continue;
+                    }
+                }
+            }
+            const func =
+                (rawAttrs.sum && "sum") ||
+                (rawAttrs.avg && "avg") ||
+                (rawAttrs.max && "max") ||
+                (rawAttrs.min && "min");
+            if (func) {
+                let aggregateValue = 0;
+                if (func === "max") {
+                    aggregateValue = Math.max(-Infinity, ...fieldValues);
+                } else if (func === "min") {
+                    aggregateValue = Math.min(Infinity, ...fieldValues);
+                } else if (func === "avg") {
+                    aggregateValue =
+                        fieldValues.reduce((acc, val) => acc + val) / fieldValues.length;
+                } else if (func === "sum") {
+                    aggregateValue = fieldValues.reduce((acc, val) => acc + val);
+                }
+
+                const formatter = formatters.get(widget, false) || formatters.get(type, false);
+                const formatOptions = {
+                    digits: rawAttrs.digits ? JSON.parse(rawAttrs.digits) : undefined,
+                    escape: true,
+                };
+                if (currencyId) {
+                    formatOptions.currencyId = currencyId;
+                }
+                aggregates[fieldName] = {
+                    help: rawAttrs[func],
+                    value: formatter ? formatter(aggregateValue, formatOptions) : aggregateValue,
+                };
+            }
+        }
+        return aggregates;
+    }
+
+    formatAggregateValue(group, column) {
+        const { widget, rawAttrs } = column;
+        const field = this.props.list.fields[column.name];
+        const aggregateValue = group.aggregates[column.name];
+        if (!(column.name in group.aggregates)) {
+            return "";
+        }
+        const formatter = formatters.get(widget, false) || formatters.get(field.type, false);
+        const formatOptions = {
+            digits: rawAttrs.digits ? JSON.parse(rawAttrs.digits) : field.digits,
+            escape: true,
+        };
+        return formatter ? formatter(aggregateValue, formatOptions) : aggregateValue;
+    }
+
+    getGroupLevel(group) {
+        return this.props.list.groupBy.length - group.list.groupBy.length - 1;
+    }
+
+    getColumnClass(column) {
+        const classNames = ["align-middle"];
+        if (this.isSortable(column)) {
+            classNames.push("o_column_sortable", "position-relative", "cursor-pointer");
+        } else {
+            classNames.push("cursor-default");
+        }
+        const orderBy = this.props.list.orderBy;
+        if (
+            orderBy.length &&
+            column.widget !== "handle" &&
+            orderBy[0].name === column.name &&
+            column.hasLabel
+        ) {
+            classNames.push("table-active");
+        }
+        if (this.isNumericColumn(column)) {
+            classNames.push("o_list_number_th");
+        }
+        if (column.type === "button_group") {
+            classNames.push("o_list_button");
+        }
+        if (column.widget) {
+            classNames.push(`o_${column.widget}_cell`);
+        }
+
+        return classNames.join(" ");
+    }
+
+    getColumns(record) {
+        return this.state.columns;
+    }
+
+    isNumericColumn(column) {
+        const { type } = this.fields[column.name];
+        return ["float", "integer", "monetary"].includes(type);
+    }
+
+    shouldReverseHeader(column) {
+        return this.isNumericColumn(column) && !this.isRTL;
+    }
+
+    isSortable(column) {
+        const { hasLabel, name } = column;
+        const { sortable } = this.fields[name];
+        const { options } = this.props.list.activeFields[name];
+        return (sortable || options.allow_order) && hasLabel;
+    }
+
+    getSortableIconClass(column) {
+        const { orderBy } = this.props.list;
+        const classNames = this.isSortable(column) ? ["fa", "fa-lg", "px-2"] : ["d-none"];
+        if (orderBy.length && orderBy[0].name === column.name) {
+            classNames.push(orderBy[0].asc ? "fa-angle-up" : "fa-angle-down");
+        } else {
+            classNames.push("fa-angle-down", "opacity-0", "opacity-75-hover");
+        }
+
+        return classNames.join(" ");
+    }
+
+    /**
+     * Returns the classnames to apply to the row representing the given record.
+     * @param {Record} record
+     * @returns {string}
+     */
+    getRowClass(record) {
+        // classnames coming from decorations
+        const classNames = this.props.archInfo.decorations
+            .filter((decoration) => evaluateExpr(decoration.condition, record.evalContext))
+            .map((decoration) => decoration.class);
+        if (record.selected) {
+            classNames.push("table-info");
+        }
+        // "o_selected_row" classname for the potential row in edition
+        if (record.isInEdition) {
+            classNames.push("o_selected_row");
+        }
+        if (record.selected) {
+            classNames.push("o_data_row_selected");
+        }
+        if (this.canResequenceRows) {
+            classNames.push("o_row_draggable");
+        }
+        return classNames.join(" ");
+    }
+
+    getCellClass(column, record) {
+        if (!this.cellClassByColumn[column.id]) {
+            const classNames = ["o_data_cell"];
+            if (column.type === "button_group") {
+                classNames.push("o_list_button");
+            } else if (column.type === "field") {
+                classNames.push("o_field_cell");
+                if (
+                    column.rawAttrs &&
+                    column.rawAttrs.class &&
+                    this.canUseFormatter(column, record)
+                ) {
+                    classNames.push(column.rawAttrs.class);
+                }
+                const typeClass = FIELD_CLASSES[this.fields[column.name].type];
+                if (typeClass) {
+                    classNames.push(typeClass);
+                }
+                if (column.widget) {
+                    classNames.push(`o_${column.widget}_cell`);
+                }
+            }
+            this.cellClassByColumn[column.id] = classNames;
+        }
+        const classNames = [...this.cellClassByColumn[column.id]];
+        if (column.type === "field") {
+            if (record.isRequired(column.name)) {
+                classNames.push("o_required_modifier");
+            }
+            if (record.isInvalid(column.name)) {
+                classNames.push("o_invalid_cell");
+            }
+            if (record.isReadonly(column.name)) {
+                classNames.push("o_readonly_modifier");
+            }
+            if (this.canUseFormatter(column, record)) {
+                // generate field decorations classNames (only if field-specific decorations
+                // have been defined in an attribute, e.g. decoration-danger="other_field = 5")
+                // only handle the text-decoration.
+                const { decorations } = record.activeFields[column.name];
+                for (const decoName in decorations) {
+                    if (evaluateExpr(decorations[decoName], record.evalContext)) {
+                        classNames.push(getClassNameFromDecoration(decoName));
+                    }
+                }
+            }
+            if (
+                record.isInEdition &&
+                this.props.list.editedRecord &&
+                this.props.list.editedRecord.isReadonly(column.name)
+            ) {
+                classNames.push("text-muted");
+            } else {
+                classNames.push("cursor-pointer");
+            }
+        }
+        return classNames.join(" ");
+    }
+
+    getCellTitle(column, record) {
+        const fieldType = this.fields[column.name].type;
+        // Because we freeze the column sizes, it may happen that we have to shorten
+        // field values. In order for the user to have access to the complete value
+        // in those situations, we put the value as title of the cells.
+        // This is only necessary for some field types, as for the others, we hardcode
+        // a minimum column width that should be enough to display the entire value.
+        // Also, we don't set title for json fields, because it's not human readable anyway.
+        if (!(fieldType in FIXED_FIELD_COLUMN_WIDTHS) && fieldType != "json") {
+            return this.getFormattedValue(column, record);
+        }
+    }
+
+    getFieldClass(column) {
+        return column.rawAttrs && column.rawAttrs.class;
+    }
+
+    getFormattedValue(column, record) {
+        const fieldName = column.name;
+        return getFormattedValue(record, fieldName, column.rawAttrs);
+    }
+
+    evalModifier(modifier, record) {
+        return evalDomain(modifier, record.evalContext);
+    }
+
+    getGroupDisplayName(group) {
+        const { _t } = this.env;
+        if (group.groupByField.type === "boolean") {
+            return group.value === undefined ? _t("None") : group.value ? _t("Yes") : _t("No");
+        } else {
+            return group.value === undefined || group.value === false
+                ? _t("None")
+                : group.displayName;
+        }
+    }
+
+    get canCreate() {
+        return "link" in this.activeActions ? this.activeActions.link : this.activeActions.create;
+    }
+
+    get isX2Many() {
+        return this.activeActions.type !== "view";
+    }
+
+    get getEmptyRowIds() {
+        let nbEmptyRow = Math.max(0, 4 - this.props.list.records.length);
+        if (nbEmptyRow > 0 && this.displayRowCreates) {
+            nbEmptyRow -= 1;
+        }
+        return Array.from(Array(nbEmptyRow).keys());
+    }
+
+    get displayRowCreates() {
+        return this.isX2Many && this.canCreate;
+    }
+
+    // Group headers logic:
+    // if there are aggregates, the first th spans until the first
+    // aggregate column then all cells between aggregates are rendered
+    // a single cell is rendered after the last aggregated column to render the
+    // pager (with adequate colspan)
+    // ex:
+    // TH TH TH TH TH AGG AGG TH AGG AGG TH TH TH
+    // 0  1  2  3  4   5   6   7  8   9  10 11 12
+    // [    TH 5    ][TH][TH][TH][TH][TH][ TH 3 ]
+    // [ group name ][ aggregate cells  ][ pager]
+    // TODO: move this somewhere, compute this only once (same result for each groups actually) ?
+    getFirstAggregateIndex(group) {
+        return this.state.columns.findIndex((col) => col.name in group.aggregates);
+    }
+    getLastAggregateIndex(group) {
+        const reversedColumns = [...this.state.columns].reverse(); // reverse is destructive
+        const index = reversedColumns.findIndex((col) => col.name in group.aggregates);
+        return index > -1 ? this.state.columns.length - index - 1 : -1;
+    }
+    getAggregateColumns(group) {
+        const firstIndex = this.getFirstAggregateIndex(group);
+        const lastIndex = this.getLastAggregateIndex(group);
+        return this.state.columns.slice(firstIndex, lastIndex + 1);
+    }
+    getGroupNameCellColSpan(group) {
+        // if there are aggregates, the first th spans until the first
+        // aggregate column then all cells between aggregates are rendered
+        const firstAggregateIndex = this.getFirstAggregateIndex(group);
+        let colspan;
+        if (firstAggregateIndex > -1) {
+            colspan = firstAggregateIndex;
+        } else {
+            colspan = Math.max(1, this.state.columns.length - DEFAULT_GROUP_PAGER_COLSPAN);
+            if (this.displayOptionalFields) {
+                colspan++;
+            }
+        }
+        if (this.hasSelectors) {
+            colspan++;
+        }
+        return colspan;
+    }
+    getGroupPagerCellColspan(group) {
+        const lastAggregateIndex = this.getLastAggregateIndex(group);
+        if (lastAggregateIndex > -1) {
+            let colspan = this.state.columns.length - lastAggregateIndex - 1;
+            if (this.displayOptionalFields) {
+                colspan++;
+            }
+            return colspan;
+        } else {
+            return this.state.columns.length > 1 ? DEFAULT_GROUP_PAGER_COLSPAN : 0;
+        }
+    }
+
+    getGroupPagerProps(group) {
+        const list = group.list;
+        return {
+            offset: list.offset,
+            limit: list.limit,
+            total: group.count,
+            onUpdate: async ({ offset, limit }) => {
+                await list.load({ limit, offset });
+                this.render(true);
+            },
+            withAccessKey: false,
+        };
+    }
+
+    getOptionalActiveFields() {
+        this.optionalActiveFields = {};
+        let optionalActiveFields = browser.localStorage.getItem(this.keyOptionalFields);
+        if (optionalActiveFields) {
+            optionalActiveFields = optionalActiveFields.split(",");
+            this.allColumns.forEach((col) => {
+                this.optionalActiveFields[col.name] = optionalActiveFields.includes(col.name);
+            });
+        } else if (optionalActiveFields !== "") {
+            this.allColumns.forEach((col) => {
+                this.optionalActiveFields[col.name] = col.optional === "show";
+            });
+        }
+        if (this.props.onOptionalFieldsChanged) {
+            this.props.onOptionalFieldsChanged(this.optionalActiveFields);
+        }
+    }
+
+    onClickSortColumn(column) {
+        if (this.preventReorder) {
+            this.preventReorder = false;
+            return;
+        }
+        if (this.props.list.editedRecord || this.props.list.model.useSampleModel) {
+            return;
+        }
+        const fieldName = column.name;
+        const list = this.props.list;
+        if (this.isSortable(column)) {
+            list.sortBy(fieldName);
+        }
+    }
+
+    onButtonCellClicked(record, column, ev) {
+        if (!ev.target.closest("button")) {
+            this.onCellClicked(record, column, ev);
+        }
+    }
+
+    async onCellClicked(record, column, ev) {
+        if (ev.target.special_click) {
+            return;
+        }
+        const recordAfterResequence = async () => {
+            const recordIndex = this.props.list.records.indexOf(record);
+            await this.resequencePromise;
+            // row might have changed record after resequence
+            record = this.props.list.records[recordIndex] || record;
+        };
+
+        if ((this.props.list.model.multiEdit && record.selected) || this.isInlineEditable(record)) {
+            if (record.isInEdition && this.props.list.editedRecord === record) {
+                const cell = this.tableRef.el.querySelector(
+                    `.o_selected_row td[name='${column.name}']`
+                );
+                if (cell && containsActiveElement(cell)) {
+                    this.lastEditedCell = { column, record };
+                    // Cell is already focused.
+                    return;
+                }
+                this.focusCell(column);
+                this.cellToFocus = null;
+            } else {
+                await recordAfterResequence();
+                await record.switchMode("edit");
+                this.cellToFocus = { column, record };
+            }
+        } else if (this.props.list.editedRecord && this.props.list.editedRecord !== record) {
+            this.props.list.unselectRecord(true);
+        } else if (!this.props.archInfo.noOpen) {
+            this.props.openRecord(record);
+        }
+    }
+
+    async onDeleteRecord(record) {
+        this.keepColumnWidths = true;
+        const editedRecord = this.props.list.editedRecord;
+        if (editedRecord && editedRecord !== record) {
+            const unselected = await this.props.list.unselectRecord(true);
+            if (!unselected) {
+                return;
+            }
+        }
+        if (this.activeActions.onDelete) {
+            this.activeActions.onDelete(record);
+        }
+    }
+
+    /**
+     * @param {HTMLTableCellElement} cell
+     * @param {boolean} cellIsInGroupRow
+     * @param {"up"|"down"|"left"|"right"} direction
+     */
+    findFocusFutureCell(cell, cellIsInGroupRow, direction) {
+        const row = cell.parentElement;
+        const children = [...row.children];
+        const index = children.indexOf(cell);
+        let futureCell;
+        switch (direction) {
+            case "up": {
+                let futureRow = row.previousElementSibling;
+                futureRow =
+                    futureRow ||
+                    (row.parentElement.previousElementSibling &&
+                        row.parentElement.previousElementSibling.lastElementChild);
+
+                if (futureRow) {
+                    const addCell = [...futureRow.children].find((c) =>
+                        c.classList.contains("o_group_field_row_add")
+                    );
+                    const nextIsGroup = futureRow.classList.contains("o_group_header");
+                    const rowTypeSwitched = cellIsInGroupRow !== nextIsGroup;
+                    let defaultIndex = 0;
+                    if (cellIsInGroupRow) {
+                        defaultIndex = this.hasSelectors ? 1 : 0;
+                    }
+                    futureCell =
+                        addCell ||
+                        (futureRow && futureRow.children[rowTypeSwitched ? defaultIndex : index]);
+                }
+                break;
+            }
+            case "down": {
+                let futureRow = row.nextElementSibling;
+                futureRow =
+                    futureRow ||
+                    (row.parentElement.nextElementSibling &&
+                        row.parentElement.nextElementSibling.firstElementChild);
+                if (futureRow) {
+                    const addCell = [...futureRow.children].find((c) =>
+                        c.classList.contains("o_group_field_row_add")
+                    );
+                    const nextIsGroup = futureRow.classList.contains("o_group_header");
+                    const rowTypeSwitched = cellIsInGroupRow !== nextIsGroup;
+                    let defaultIndex = 0;
+                    if (cellIsInGroupRow) {
+                        defaultIndex = this.hasSelectors ? 1 : 0;
+                    }
+                    futureCell =
+                        addCell ||
+                        (futureRow && futureRow.children[rowTypeSwitched ? defaultIndex : index]);
+                }
+                break;
+            }
+            case "left": {
+                futureCell = children[index - 1];
+                break;
+            }
+            case "right": {
+                futureCell = children[index + 1];
+                break;
+            }
+        }
+        return futureCell && getElementToFocus(futureCell);
+    }
+
+    isInlineEditable(record) {
+        // /!\ the keyboard navigation works under the hypothesis that all or
+        // none records are editable.
+        return !!this.props.editable;
+    }
+
+    /**
+     * @param {KeyboardEvent} ev
+     * @param { import('@web/views/relational_model').Group
+     *  | null
+     * } group
+     * @param { import('@web/views/relational_model').Record
+     *  | import('@web/views/basic_relational_model').Record
+     *  | null
+     * } record
+     */
+    onCellKeydown(ev, group = null, record = null) {
+        if (this.props.list.model.useSampleModel) {
+            return;
+        }
+
+        const hotkey = getActiveHotkey(ev);
+
+        if (ev.target.tagName === "TEXTAREA" && hotkey === "enter") {
+            return;
+        }
+
+        const closestCell = ev.target.closest("td, th");
+
+        const handled = this.props.list.editedRecord
+            ? this.onCellKeydownEditMode(hotkey, closestCell, group, record)
+            : this.onCellKeydownReadOnlyMode(hotkey, closestCell, group, record); // record is supposed to be not null here
+
+        if (handled) {
+            this.lastCreatingAction = false;
+            this.tableRef.el.querySelector("tbody").classList.add("o_keyboard_navigation");
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+    }
+
+    findNextFocusableOnRow(row, cell) {
+        const children = [...row.children];
+        const index = children.indexOf(cell);
+        const nextCells = children.slice(index + 1);
+        for (const c of nextCells) {
+            if (!c.classList.contains("o_data_cell")) {
+                continue;
+            }
+            if (
+                c.firstElementChild &&
+                c.firstElementChild.classList.contains("o_readonly_modifier")
+            ) {
+                continue;
+            }
+            const toFocus = getElementToFocus(c);
+            if (toFocus !== c) {
+                return toFocus;
+            }
+        }
+        return null;
+    }
+
+    findPreviousFocusableOnRow(row, cell) {
+        const children = [...row.children];
+        const index = children.indexOf(cell);
+        const previousCells = children.slice(0, index);
+        for (const c of previousCells.reverse()) {
+            if (!c.classList.contains("o_data_cell")) {
+                continue;
+            }
+            if (
+                c.firstElementChild &&
+                c.firstElementChild.classList.contains("o_readonly_modifier")
+            ) {
+                continue;
+            }
+            const toFocus = getElementToFocus(c);
+            if (toFocus !== c) {
+                return toFocus;
+            }
+        }
+        return null;
+    }
+
+    applyCellKeydownMultiEditMode(hotkey, cell, group, record) {
+        const { list } = this.props;
+        const row = cell.parentElement;
+        let toFocus, futureRecord;
+        const index = list.selection.indexOf(record);
+        if (this.lastIsDirty && ["tab", "shift+tab", "enter"].includes(hotkey)) {
+            record.switchMode("readonly");
+            return true;
+        }
+
+        if (this.applyCellKeydownEditModeStayOnRow(hotkey, cell, group, record)) {
+            return true;
+        }
+
+        switch (hotkey) {
+            case "tab":
+                futureRecord = list.selection[index + 1] || list.selection[0];
+                if (record === futureRecord) {
+                    // Refocus first cell of same record
+                    toFocus = this.findNextFocusableOnRow(row);
+                    this.focus(toFocus);
+                    return true;
+                }
+                break;
+
+            case "shift+tab":
+                futureRecord =
+                    list.selection[index - 1] || list.selection[list.selection.length - 1];
+                if (record === futureRecord) {
+                    // Refocus last cell of same record
+                    toFocus = this.findPreviousFocusableOnRow(row);
+                    this.focus(toFocus);
+                    return true;
+                }
+                this.cellToFocus = { forward: false, record: futureRecord };
+                break;
+
+            case "enter":
+                if (list.selection.length === 1) {
+                    record.switchMode("readonly");
+                    return true;
+                }
+                futureRecord = list.selection[index + 1] || list.selection[0];
+                break;
+        }
+
+        if (futureRecord) {
+            futureRecord.switchMode("edit");
+            return true;
+        }
+        return false;
+    }
+
+    applyCellKeydownEditModeGroup(hotkey, _cell, group, record) {
+        const { editable } = this.props;
+        const groupIndex = group.list.records.indexOf(record);
+        const isLastOfGroup = groupIndex === group.list.records.length - 1;
+        const isDirty = record.isDirty || this.lastIsDirty;
+        const isEnterBehavior = hotkey === "enter" && (!record.canBeAbandoned || isDirty);
+        const isTabBehavior = hotkey === "tab" && !record.canBeAbandoned && isDirty;
+        if (
+            isLastOfGroup &&
+            this.canCreate &&
+            editable === "bottom" &&
+            (isEnterBehavior || isTabBehavior)
+        ) {
+            this.add({ group });
+            return true;
+        }
+        return false;
+    }
+
+    applyCellKeydownEditModeStayOnRow(hotkey, cell, group, record) {
+        let toFocus;
+        const row = cell.parentElement;
+
+        switch (hotkey) {
+            case "tab":
+                toFocus = this.findNextFocusableOnRow(row, cell);
+                break;
+            case "shift+tab":
+                toFocus = this.findPreviousFocusableOnRow(row, cell);
+                break;
+        }
+
+        if (toFocus) {
+            this.focus(toFocus);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @param {string} hotkey
+     * @param {HTMLTableCellElement} cell
+     * @param { import('@web/views/relational_model').Group
+     *  | null
+     * } group
+     * @param { import('@web/views/relational_model').Record
+     *  | import('@web/views/basic_relational_model').Record
+     * } record
+     * @returns {boolean} true if some behavior has been taken
+     */
+    onCellKeydownEditMode(hotkey, cell, group, record) {
+        const { cycleOnTab, list } = this.props;
+        const row = cell.parentElement;
+        const applyMultiEditBehavior = record && record.selected && list.model.multiEdit;
+        const topReCreate = this.props.editable === "top" && record.isNew;
+
+        if (
+            applyMultiEditBehavior &&
+            this.applyCellKeydownMultiEditMode(hotkey, cell, group, record)
+        ) {
+            return true;
+        }
+
+        if (this.applyCellKeydownEditModeStayOnRow(hotkey, cell, group, record)) {
+            return true;
+        }
+
+        if (group && this.applyCellKeydownEditModeGroup(hotkey, cell, group, record)) {
+            return true;
+        }
+
+        switch (hotkey) {
+            case "tab": {
+                const index = list.records.indexOf(record);
+                const lastIndex = topReCreate ? 0 : list.records.length - 1;
+                if (index === lastIndex) {
+                    if (this.displayRowCreates) {
+                        if (record.isNew && !record.isDirty) {
+                            list.unselectRecord(true);
+                            return false;
+                        }
+                        // add a line
+                        const { context } = this.creates[0];
+                        this.add({ context });
+                    } else if (
+                        this.canCreate &&
+                        !record.canBeAbandoned &&
+                        (record.isDirty || this.lastIsDirty)
+                    ) {
+                        this.add({ group });
+                    } else if (cycleOnTab) {
+                        if (record.canBeAbandoned) {
+                            list.unselectRecord(true);
+                        }
+                        const futureRecord = list.records[0];
+                        if (record === futureRecord) {
+                            // Refocus first cell of same record
+                            const toFocus = this.findNextFocusableOnRow(row);
+                            this.focus(toFocus);
+                        } else {
+                            futureRecord.switchMode("edit");
+                        }
+                    } else {
+                        return false;
+                    }
+                } else {
+                    const futureRecord = list.records[index + 1];
+                    futureRecord.switchMode("edit");
+                }
+                break;
+            }
+            case "shift+tab": {
+                const index = list.records.indexOf(record);
+                if (index === 0) {
+                    if (cycleOnTab) {
+                        if (record.canBeAbandoned) {
+                            list.unselectRecord(true);
+                        }
+                        const futureRecord = list.records[list.records.length - 1];
+                        if (record === futureRecord) {
+                            // Refocus first cell of same record
+                            const toFocus = this.findPreviousFocusableOnRow(row);
+                            this.focus(toFocus);
+                        } else {
+                            this.cellToFocus = { forward: false, record: futureRecord };
+                            futureRecord.switchMode("edit");
+                        }
+                    } else {
+                        list.unselectRecord(true);
+                        return false;
+                    }
+                } else {
+                    const futureRecord = list.records[index - 1];
+                    this.cellToFocus = { forward: false, record: futureRecord };
+                    futureRecord.switchMode("edit");
+                }
+                break;
+            }
+            case "enter": {
+                const index = list.records.indexOf(record);
+                let futureRecord = list.records[index + 1];
+                if (topReCreate && index === 0) {
+                    futureRecord = null;
+                }
+
+                if (!futureRecord && !this.canCreate) {
+                    futureRecord = list.records[0];
+                }
+
+                if (futureRecord) {
+                    futureRecord.switchMode("edit", { checkValidity: true });
+                } else if (this.lastIsDirty || !record.canBeAbandoned || this.displayRowCreates) {
+                    this.add({ group });
+                } else {
+                    futureRecord = list.records.at(0);
+                    futureRecord.switchMode("edit", { checkValidity: true });
+                }
+                break;
+            }
+            case "escape": {
+                // TODO this seems bad: refactor this
+                record.discard();
+                list.unselectRecord(true);
+                const firstAddButton = this.tableRef.el.querySelector(
+                    ".o_field_x2many_list_row_add a"
+                );
+
+                if (firstAddButton) {
+                    this.focus(firstAddButton);
+                } else if (group && record.isNew) {
+                    const children = [...row.parentElement.children];
+                    const index = children.indexOf(row);
+                    for (let i = index + 1; i < children.length; i++) {
+                        const row = children[i];
+                        if (row.classList.contains("o_group_header")) {
+                            break;
+                        }
+                        const addCell = [...row.children].find((c) =>
+                            c.classList.contains("o_group_field_row_add")
+                        );
+                        if (addCell) {
+                            const toFocus = addCell.querySelector("a");
+                            this.focus(toFocus);
+                            return true;
+                        }
+                    }
+                    this.focus(cell);
+                } else {
+                    this.focus(cell);
+                }
+                break;
+            }
+            default:
+                return false;
+        }
+        return true;
+    }
+
+    /**
+     * @param {string} hotkey
+     * @param {HTMLTableCellElement} cell
+     * @param { import('@web/views/relational_model').Group
+     *  | null
+     * } group
+     * @param { import('@web/views/relational_model').Record
+     *  | import('@web/views/basic_relational_model').Record
+     *  | null
+     * } record
+     * @returns {boolean} true if some behavior has been taken
+     */
+    onCellKeydownReadOnlyMode(hotkey, cell, group, record) {
+        const cellIsInGroupRow = Boolean(group && !record);
+        const applyMultiEditBehavior = record && record.selected && this.props.list.model.multiEdit;
+        let toFocus;
+        switch (hotkey) {
+            case "arrowup":
+                toFocus = this.findFocusFutureCell(cell, cellIsInGroupRow, "up");
+                if (!toFocus && this.env.searchModel) {
+                    this.env.searchModel.trigger("focus-search");
+                    return true;
+                }
+                break;
+            case "arrowdown":
+                toFocus = this.findFocusFutureCell(cell, cellIsInGroupRow, "down");
+                break;
+            case "arrowleft":
+                if (cellIsInGroupRow && !group.isFolded) {
+                    this.toggleGroup(group);
+                    return true;
+                }
+
+                if (cell.classList.contains("o_field_x2many_list_row_add")) {
+                    // to refactor
+                    const a = document.activeElement;
+                    toFocus = a.previousElementSibling;
+                } else {
+                    toFocus = this.findFocusFutureCell(cell, cellIsInGroupRow, "left");
+                }
+                break;
+            case "arrowright":
+                if (cellIsInGroupRow && group.isFolded) {
+                    this.toggleGroup(group);
+                    return true;
+                }
+
+                if (cell.classList.contains("o_field_x2many_list_row_add")) {
+                    // This cell contains only <a/> elements, see template.
+                    const a = document.activeElement;
+                    toFocus = a.nextElementSibling;
+                } else {
+                    toFocus = this.findFocusFutureCell(cell, cellIsInGroupRow, "right");
+                }
+                break;
+            case "tab":
+                if (cellIsInGroupRow) {
+                    const buttons = Array.from(cell.querySelectorAll(".o_group_buttons button"));
+                    const currentButton = document.activeElement.closest("button");
+                    const index = buttons.indexOf(currentButton);
+                    toFocus = buttons[index + 1] || currentButton;
+                }
+                break;
+            case "shift+tab":
+                if (cellIsInGroupRow) {
+                    const buttons = Array.from(cell.querySelectorAll(".o_group_buttons button"));
+                    const currentButton = document.activeElement.closest("button");
+                    const index = buttons.indexOf(currentButton);
+                    toFocus = buttons[index - 1] || currentButton;
+                }
+                break;
+            case "enter":
+                if (!group && !record) {
+                    return false;
+                }
+
+                if (cell.classList.contains("o_list_record_remove")) {
+                    this.onDeleteRecord(record);
+                    return true;
+                }
+
+                if (cellIsInGroupRow) {
+                    const button = document.activeElement.closest("button");
+                    if (button) {
+                        button.click();
+                    } else {
+                        this.toggleGroup(group);
+                    }
+                    return true;
+                }
+
+                if (this.isInlineEditable(record) || applyMultiEditBehavior) {
+                    const column = this.state.columns.find(
+                        (c) => c.name === cell.getAttribute("name")
+                    );
+                    this.cellToFocus = { column, record };
+                    record.switchMode("edit");
+                    return true;
+                }
+
+                if (!this.props.archInfo.noOpen) {
+                    this.props.openRecord(record);
+                    return true;
+                }
+                break;
+            default:
+                // Return with no effect (no stop or prevent default...)
+                return false;
+        }
+
+        if (toFocus) {
+            this.focus(toFocus);
+            return true;
+        }
+
+        return false;
+    }
+
+    async onCreateAction(context) {
+        // TO DISCUSS: is it a use case for owl `batched()` ?
+        if (this.createProm) {
+            return;
+        }
+        this.add({ context });
+        this.createProm = Promise.resolve();
+        this.createProm.then(() => {
+            this.lastCreatingAction = true;
+        });
+        await this.createProm;
+        this.createProm = null;
+    }
+
+    /**
+     * @param {FocusEvent & {
+     *  target: HTMLElement,
+     *  relatedTarget: HTMLElement | null
+     * }} ev
+     */
+    onFocusIn(ev) {
+        const { relatedTarget, target } = ev;
+        const fromOutside = !this.rootRef.el.contains(relatedTarget);
+        if (!fromOutside) {
+            return;
+        }
+
+        const isX2MRowAdder =
+            target.tagName === "A" &&
+            target.parentElement.classList.contains("o_field_x2many_list_row_add");
+        const withinSameUIActiveElement =
+            this.uiService.getActiveElementOf(relatedTarget) === this.activeElement;
+        if (withinSameUIActiveElement && isX2MRowAdder) {
+            const { context } = this.creates[0];
+            this.onCreateAction(context);
+        }
+    }
+
+    setDirty(isDirty) {
+        this.lastIsDirty = isDirty;
+    }
+
+    saveOptionalActiveFields() {
+        browser.localStorage.setItem(
+            this.keyOptionalFields,
+            Object.keys(this.optionalActiveFields).filter(
+                (fieldName) => this.optionalActiveFields[fieldName]
+            )
+        );
+    }
+
+    get showNoContentHelper() {
+        const { model } = this.props.list;
+        return this.props.noContentHelp && (model.useSampleModel || !model.hasData());
+    }
+
+    showGroupPager(group) {
+        return !group.isFolded && group.list.limit < group.count;
+    }
+
+    toggleGroup(group) {
+        group.toggle();
+    }
+
+    get canSelectRecord() {
+        return !this.props.list.editedRecord && !this.props.list.model.useSampleModel;
+    }
+
+    toggleSelection() {
+        const list = this.props.list;
+        if (!this.canSelectRecord) {
+            return;
+        }
+        if (list.selection.length === list.records.length) {
+            list.records.forEach((record) => {
+                record.toggleSelection(false);
+                list.selectDomain(false);
+            });
+        } else {
+            list.records.forEach((record) => {
+                record.toggleSelection(true);
+            });
+        }
+    }
+
+    toggleRecordSelection(record) {
+        if (!this.canSelectRecord) {
+            return;
+        }
+        record.toggleSelection();
+        this.props.list.selectDomain(false);
+    }
+
+    async toggleOptionalField(fieldName) {
+        this.optionalActiveFields[fieldName] = !this.optionalActiveFields[fieldName];
+        if (this.props.onOptionalFieldsChanged) {
+            this.props.onOptionalFieldsChanged(this.optionalActiveFields);
+        }
+        this.state.columns = this.getActiveColumns(this.props.list);
+        this.saveOptionalActiveFields(
+            this.allColumns.filter((col) => this.optionalActiveFields[col.name] && col.optional)
+        );
+    }
+
+    onGlobalClick(ev) {
+        if (!this.props.list.editedRecord) {
+            return; // there's no row in edition
+        }
+
+        this.tableRef.el.querySelector("tbody").classList.remove("o_keyboard_navigation");
+
+        const target = ev.target;
+        if (this.tableRef.el.contains(target) && target.closest(".o_data_row")) {
+            // ignore clicks inside the table that are originating from a record row
+            // as they are handled directly by the renderer.
+            return;
+        }
+        if (this.activeElement !== this.uiService.activeElement) {
+            return;
+        }
+        // Legacy DatePicker
+        if (target.closest(".daterangepicker")) {
+            return;
+        }
+        // Legacy autocomplete
+        if (ev.target.closest(".ui-autocomplete")) {
+            return;
+        }
+        this.props.list.unselectRecord(true);
+    }
+
+    calculateColumnWidth(column) {
+        if (column.options && column.rawAttrs.width) {
+            return { type: "absolute", value: column.rawAttrs.width };
+        }
+
+        if (column.type !== "field") {
+            return { type: "relative", value: 1 };
+        }
+
+        const type = column.widget || this.props.list.fields[column.name].type;
+        if (type in FIXED_FIELD_COLUMN_WIDTHS) {
+            return { type: "absolute", value: FIXED_FIELD_COLUMN_WIDTHS[type] };
+        }
+
+        return { type: "relative", value: 1 };
+    }
+
+    get isDebugMode() {
+        return Boolean(odoo.debug);
+    }
+
+    makeTooltip(column) {
+        return getTooltipInfo({
+            viewMode: "list",
+            resModel: this.props.list.resModel,
+            field: this.props.list.fields[column.name],
+            fieldInfo: this.props.list.activeFields[column.name],
+        });
+    }
+
+    /**
+     * Handles the :hover effect on sortable column headers
+     *
+     * @private
+     * @param {MouseEvent} ev
+     */
+    onHoverSortColumn(ev, column) {
+        if (this.props.list.orderBy.length && this.props.list.orderBy[0].name === column.name) {
+            return;
+        } else if (this.isSortable(column) && column.widget !== "handle") {
+            ev.target.classList.toggle("table-active", ev.type == "mouseenter");
+        }
+    }
+
+    onColumnTitleMouseUp() {
+        if (this.resizing) {
+            this.preventReorder = true;
+        }
+    }
+
+    /**
+     * Handles the resize feature on the column headers
+     *
+     * @private
+     * @param {MouseEvent} ev
+     */
+    onStartResize(ev) {
+        this.resizing = true;
+        const table = this.tableRef.el;
+        const th = ev.target.closest("th");
+        const handler = th.querySelector(".o_resize");
+        table.style.width = `${Math.floor(table.getBoundingClientRect().width)}px`;
+        const thPosition = [...th.parentNode.children].indexOf(th);
+        const resizingColumnElements = [...table.getElementsByTagName("tr")]
+            .filter((tr) => tr.children.length === th.parentNode.children.length)
+            .map((tr) => tr.children[thPosition]);
+        const initialX = ev.clientX;
+        const initialWidth = th.getBoundingClientRect().width;
+        const initialTableWidth = table.getBoundingClientRect().width;
+        const resizeStoppingEvents = ["keydown", "mousedown", "mouseup"];
+
+        // fix the width so that if the resize overflows, it doesn't affect the layout of the parent
+        if (!this.rootRef.el.style.width) {
+            this.rootRef.el.style.width = `${Math.floor(
+                this.rootRef.el.getBoundingClientRect().width
+            )}px`;
+        }
+
+        // Apply classes to table and selected column
+        table.classList.add("o_resizing");
+        for (const el of resizingColumnElements) {
+            el.classList.add("o_column_resizing");
+            handler.classList.add("bg-primary", "opacity-100");
+            handler.classList.remove("bg-black-25", "opacity-50-hover");
+        }
+        // Mousemove event : resize header
+        const resizeHeader = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const delta = ev.clientX - initialX;
+            const newWidth = Math.max(10, initialWidth + delta);
+            const tableDelta = newWidth - initialWidth;
+            th.style.width = `${Math.floor(newWidth)}px`;
+            th.style.maxWidth = `${Math.floor(newWidth)}px`;
+            table.style.width = `${Math.floor(initialTableWidth + tableDelta)}px`;
+        };
+        window.addEventListener("mousemove", resizeHeader);
+
+        // Mouse or keyboard events : stop resize
+        const stopResize = (ev) => {
+            this.resizing = false;
+            // freeze column size after resizing
+            this.keepColumnWidths = true;
+            // Ignores the 'left mouse button down' event as it used to start resizing
+            if (ev.type === "mousedown" && ev.which === 1) {
+                return;
+            }
+            ev.preventDefault();
+            ev.stopPropagation();
+
+            table.classList.remove("o_resizing");
+            for (const el of resizingColumnElements) {
+                el.classList.remove("o_column_resizing");
+                handler.classList.remove("bg-primary", "opacity-100");
+                handler.classList.add("bg-black-25", "opacity-50-hover");
+            }
+
+            window.removeEventListener("mousemove", resizeHeader);
+            for (const eventType of resizeStoppingEvents) {
+                window.removeEventListener(eventType, stopResize);
+            }
+
+            // we remove the focus to make sure that the there is no focus inside
+            // the tr.  If that is the case, there is some css to darken the whole
+            // thead, and it looks quite weird with the small css hover effect.
+            document.activeElement.blur();
+        };
+        // We have to listen to several events to properly stop the resizing function. Those are:
+        // - mousedown (e.g. pressing right click)
+        // - mouseup : logical flow of the resizing feature (drag & drop)
+        // - keydown : (e.g. pressing 'Alt' + 'Tab' or 'Windows' key)
+        for (const eventType of resizeStoppingEvents) {
+            window.addEventListener(eventType, stopResize);
+        }
+    }
+
+    resetLongTouchTimer() {
+        if (this.longTouchTimer) {
+            browser.clearTimeout(this.longTouchTimer);
+            this.longTouchTimer = null;
+        }
+    }
+
+    onRowTouchStart(record, ev) {
+        if (!this.props.allowSelectors) {
+            return;
+        }
+        if (this.props.list.selection.length) {
+            ev.stopPropagation(); // This is done in order to prevent the tooltip from showing up
+        }
+        this.touchStartMs = Date.now();
+        if (this.longTouchTimer === null) {
+            this.longTouchTimer = browser.setTimeout(() => {
+                this.toggleRecordSelection(record);
+                this.resetLongTouchTimer();
+            }, this.constructor.LONG_TOUCH_THRESHOLD);
+        }
+    }
+    onRowTouchEnd(record) {
+        const elapsedTime = Date.now() - this.touchStartMs;
+        if (elapsedTime < this.constructor.LONG_TOUCH_THRESHOLD) {
+            this.resetLongTouchTimer();
+        }
+    }
+    onRowTouchMove(record) {
+        this.resetLongTouchTimer();
+    }
+
+    /**
+     * @param {string} dataRowId
+     * @param {Object} params
+     * @param {HTMLElement} params.element
+     * @param {HTMLElement} [params.group]
+     * @param {HTMLElement} [params.next]
+     * @param {HTMLElement} [params.parent]
+     * @param {HTMLElement} [params.previous]
+     */
+    async sortDrop(dataRowId, { element, previous }) {
+        if (this.props.list.editedRecord) {
+            this.props.list.unselectRecord(true);
+        }
+        element.classList.remove("o_row_draggable");
+        const refId = previous ? previous.dataset.id : null;
+        try {
+            this.resequencePromise = this.props.list.resequence(dataRowId, refId, {
+                handleField: this.props.archInfo.handleField,
+            });
+            await this.resequencePromise;
+        } finally {
+            element.classList.add("o_row_draggable");
+        }
+    }
+
+    /**
+     * @param {Object} params
+     * @param {HTMLElement} params.element
+     * @param {HTMLElement} [params.group]
+     */
+    sortStart({ element }) {
+        element.classList.add("o_dragged");
+        const table = this.tableRef.el;
+        const headers = [...table.querySelectorAll("thead th")];
+        const cells = [...element.querySelectorAll("td")];
+        let headerIndex = 0;
+        for (const cell of cells) {
+            let width = 0;
+            for (let i = 0; i < cell.colSpan; i++) {
+                const header = headers[headerIndex + i];
+                const style = getComputedStyle(header);
+                width += parseFloat(style.width);
+            }
+            cell.style.width = `${width}px`;
+            headerIndex += cell.colSpan;
+        }
+    }
+
+    /**
+     * @param {Object} params
+     * @param {HTMLElement} params.element
+     * @param {HTMLElement} [params.group]
+     */
+    sortStop({ element }) {
+        element.classList.remove("o_dragged");
+        for (const cell of element.querySelectorAll("td")) {
+            cell.style.width = null;
+        }
+    }
+
+    ignoreEventInSelectionMode(ev) {
+        const { list } = this.props;
+        if (this.env.isSmall && list.selection && list.selection.length) {
+            // in selection mode, only selection is allowed.
+            ev.stopPropagation();
+            ev.preventDefault();
+        }
+    }
+
+    onClickCapture(record, ev) {
+        const { list } = this.props;
+        if (this.env.isSmall && list.selection && list.selection.length) {
+            ev.stopPropagation();
+            ev.preventDefault();
+            this.toggleRecordSelection(record);
+        }
+    }
+}
+
+ListRenderer.template = "web.ListRenderer";
+
+ListRenderer.rowsTemplate = "web.ListRenderer.Rows";
+ListRenderer.recordRowTemplate = "web.ListRenderer.RecordRow";
+ListRenderer.groupRowTemplate = "web.ListRenderer.GroupRow";
+
+ListRenderer.components = { DropdownItem, Field, ViewButton, CheckBox, Dropdown, Pager, Widget };
+ListRenderer.props = [
+    "activeActions?",
+    "list",
+    "archInfo",
+    "openRecord",
+    "onAdd?",
+    "cycleOnTab?",
+    "allowSelectors?",
+    "editable?",
+    "noContentHelp?",
+    "nestedKeyOptionalFieldsData?",
+    "readonly?",
+    "onOptionalFieldsChanged?",
+];
+ListRenderer.defaultProps = { hasSelectors: false, cycleOnTab: true };
+
+ListRenderer.LONG_TOUCH_THRESHOLD = 400;
+
+```
+
+  </TabItem>
+  <TabItem value="list_renderer_xml" label="list_renderer.xml">
+
+```xml title="list_renderer.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="web.ListRenderer" owl="1">
+        <div
+            class="o_list_renderer o_renderer table-responsive"
+            t-attf-class="{{ props.archInfo.className or '' }}"
+            tabindex="-1"
+            t-ref="root"
+        >
+            <t t-if="showNoContentHelper" t-call="web.ActionHelper">
+                <t t-set="noContentHelp" t-value="props.noContentHelp"/>
+            </t>
+            <table t-attf-class="o_list_table table table-sm table-hover position-relative mb-0 {{props.list.isGrouped ? 'o_list_table_grouped' : 'o_list_table_ungrouped table-striped'}}" t-ref="table">
+                <thead>
+                    <tr>
+                        <th t-if="hasSelectors" class="o_list_record_selector o_list_controller align-middle pe-1 cursor-pointer" tabindex="-1" t-on-keydown="(ev) => this.onCellKeydown(ev)" t-on-click.stop="toggleSelection">
+                            <CheckBox disabled="!canSelectRecord" value="selectAll" className="'d-flex'" onChange.bind="toggleSelection"/>
+                        </th>
+                        <t t-foreach="state.columns" t-as="column" t-key="column.id">
+                            <th t-if="column.type === 'field'"
+                                t-att-data-name="column.name"
+                                t-att-class="getColumnClass(column) + ' opacity-trigger-hover'"
+                                t-on-mouseenter="ev => this.onHoverSortColumn(ev, column)"
+                                t-on-mouseleave="ev => this.onHoverSortColumn(ev, column)"
+                                t-on-mouseup="onColumnTitleMouseUp"
+                                t-on-click="() => this.onClickSortColumn(column)"
+                                t-on-keydown="(ev) => this.onCellKeydown(ev)"
+                                t-att-data-tooltip-template="isDebugMode ? 'web.FieldTooltip' : false"
+                                t-att-data-tooltip-info="isDebugMode ? makeTooltip(column) : false"
+                                data-tooltip-delay="1000"
+                                tabindex="-1">
+                                <t t-if="column.hasLabel and column.widget !== 'handle'">
+                                <t t-set="isNumeric" t-value="isNumericColumn(column)"/>
+                                    <div t-att-class="{'d-flex': true, 'flex-row-reverse': shouldReverseHeader(column)}">
+                                        <span class="d-block min-w-0 text-truncate flex-grow-1" t-att-class="isNumeric ? 'o_list_number_th' : ''"
+                                              t-esc="column.label"/>
+                                        <i t-att-class="getSortableIconClass(column)"/>
+                                    </div>
+                                    <span t-if="!isEmpty"
+                                          class="o_resize position-absolute top-0 end-0 bottom-0 ps-1 bg-black-25 opacity-0 opacity-50-hover z-index-1"
+                                          t-on-mousedown.stop.prevent="onStartResize"/>
+                                </t>
+                            </th>
+                            <th t-else="" t-on-keydown="(ev) => this.onCellKeydown(ev)" t-att-class="{o_list_button: column.type === 'button_group'}"/>
+                        </t>
+                        <th t-if="displayOptionalFields or activeActions.onDelete" t-on-keydown="(ev) => this.onCellKeydown(ev)" class="o_list_controller o_list_actions_header position-static" style="width: 32px; min-width: 32px">
+                            <Dropdown t-if="displayOptionalFields"
+                                class="'o_optional_columns_dropdown border-top-0 text-center'"
+                                togglerClass="'btn p-0'"
+                                skipTogglerTabbing="true"
+                                position="'bottom-end'">
+                                <t t-set-slot="toggler">
+                                    <i class="o_optional_columns_dropdown_toggle oi oi-fw oi-settings-adjust"/>
+                                </t>
+
+                                <t t-foreach="getOptionalFields" t-as="field" t-key="field_index">
+                                    <DropdownItem parentClosingMode="'none'" onSelected="() => this.toggleOptionalField(field.name)">
+                                        <CheckBox
+                                            onChange="() => this.toggleOptionalField(field.name)"
+                                            value="field.value"
+                                            name="field.name"
+                                        >
+                                            <t t-esc="field.label"/> <t t-if="env.debug" t-esc="' (' + field.name + ')'" />
+                                        </CheckBox>
+                                    </DropdownItem>
+                                </t>
+                            </Dropdown>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="ui-sortable">
+                    <t t-call="{{ constructor.rowsTemplate }}">
+                        <t t-set="list" t-value="props.list"/>
+                    </t>
+                </tbody>
+                <tfoot t-on-click="() => props.list.unselectRecord(true)" class="o_list_footer cursor-default" t-att-class="{o_sample_data_disabled: props.list.model.useSampleModel}">
+                    <tr>
+                        <td t-if="hasSelectors"/>
+                        <t t-foreach="state.columns" t-as="column" t-key="column.id">
+                            <t t-set="aggregate" t-value="aggregates[column.name]"/>
+                            <td t-if="aggregate" class="o_list_number" t-att-data-tooltip="aggregate.help">
+                                <t t-esc="aggregate.value"/>
+                            </td>
+                            <td t-else=""/>
+                        </t>
+                        <td t-if="displayOptionalFields or activeActions.onDelete"/>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </t>
+
+    <t t-name="web.ListRenderer.Rows" owl="1">
+        <t t-if="!list.isGrouped">
+            <t t-foreach="list.records" t-as="record" t-key="record.id">
+                <t t-call="{{ constructor.recordRowTemplate }}"/>
+            </t>
+            <tr t-if="displayRowCreates">
+                <td t-if="withHandleColumn"/>
+                <td t-att-colspan="withHandleColumn ? nbCols - 1 : nbCols"
+                    class="o_field_x2many_list_row_add"
+                    t-on-keydown="(ev) => this.onCellKeydown(ev, null)"
+                >
+                    <t t-foreach="creates" t-as="create" t-key="create_index">
+                        <a
+                            t-if="create.type === 'create'"
+                            href="#"
+                            role="button"
+                            t-att-class="create_index !== 0 ? 'ml16' : ''"
+                            t-att-tabindex="props.list.editedRecord ? '-1' : '0'"
+                            t-on-click.stop.prevent="() => this.add({ context: create.context })"
+                        >
+                            <t t-esc="create.string"/>
+                        </a>
+                        <ViewButton
+                            t-if="create.type === 'button'"
+                            className="`${create.className} ${create_index !== 0 ? 'ml16' : ''}`"
+                            clickParams="create.clickParams"
+                            icon="create.icon"
+                            record="props.list"
+                            string="create.string"
+                            title="create.title"
+                            tabindex="props.list.editedRecord ? '-1' : '0'"
+                        />
+                    </t>
+                </td>
+            </tr>
+            <t t-if="!props.list.isGrouped">
+                <tr t-foreach="getEmptyRowIds" t-as="emptyRowId" t-key="emptyRowId">
+                    <td t-att-colspan="nbCols">&#8203;</td>
+                </tr>
+            </t>
+        </t>
+        <t t-else="">
+            <t t-foreach="list.groups" t-as="group" t-key="group.id">
+                <t t-call="{{ constructor.groupRowTemplate }}"/>
+                <t t-if="!group.isFolded">
+                    <t t-call="{{ constructor.rowsTemplate }}">
+                        <t t-set="list" t-value="group.list"/>
+                    </t>
+                    <tr t-if="!group.list.isGrouped and props.editable and canCreate">
+                        <td t-if="hasSelectors"/>
+                        <td
+                            t-att-colspan="hasSelector ? nbCols - 1 : nbCols"
+                            class="o_group_field_row_add"
+                        >
+                            <a href="#"
+                                role="button"
+                                t-on-click.stop.prevent="() => group.createRecord({}, props.editable === 'top')"
+                                t-on-keydown="(ev) => this.onCellKeydown(ev)"
+                            >
+                                Add a line
+                            </a>
+                        </td>
+                    </tr>
+                </t>
+            </t>
+        </t>
+    </t>
+
+    <t t-name="web.ListRenderer.GroupRow" owl="1">
+        <tr t-attf-class="{{group.count > 0 ? 'o_group_has_content' : ''}} o_group_header {{!group.isFolded ? 'o_group_open' : ''}} cursor-pointer"
+            t-on-click="() => this.toggleGroup(group)"
+        >
+            <th t-on-keydown="(ev) => this.onCellKeydown(ev, group)"
+                tabindex="-1"
+                t-attf-class="o_group_name fs-6 fw-bold {{!group.isFolded ? 'text-900' : 'text-700'}}"
+                t-att-colspan="getGroupNameCellColSpan(group)">
+                <div class="d-flex">
+                    <span t-attf-class="o_group_caret fa fa-fw {{group.isFolded ? 'fa-caret-right' : 'fa-caret-down' }} me-1"
+                        t-attf-style="--o-list-group-level: {{getGroupLevel(group)}}"/>
+                    <t t-esc="getGroupDisplayName(group)"/> (<t t-esc="group.count"/>)
+                    <div t-if="(groupByButtons[group.groupByField.name] and !group.isFolded)" class="o_group_buttons">
+                        <t t-foreach="groupByButtons[group.groupByField.name]" t-as="button" t-key="button.id">
+                            <t t-if="!evalModifier(button.modifiers.invisible, group.record)">
+                                <t t-if="button.clickParams.type === 'edit'">
+                                    <button t-att-title="button.title" class="btn" t-on-click="() => this.editGroupRecord(group)" tabindex="-1">
+                                        <i t-attf-class="fa fa-fw {{button.icon}} o_button_icon"/>
+                                    </button>
+                                </t>
+                                <t t-else="">
+                                    <ViewButton
+                                        className="button.className"
+                                        clickParams="button.clickParams"
+                                        icon="button.icon"
+                                        record="group.record"
+                                        string="button.string"
+                                        title="button.title"
+                                        tabindex="'-1'"
+                                    />
+                                </t>
+                            </t>
+                        </t>
+                    </div>
+                    <div t-if="showGroupPager(group)" class="ms-auto">
+                        <Pager t-props="getGroupPagerProps(group)"/>
+                    </div>
+                </div>
+            </th>
+            <td t-on-keydown="(ev) => this.onCellKeydown(ev, group)" t-foreach="getAggregateColumns(group)" t-as="column" t-key="column.id" t-att-class="{'o_list_number': column.type === 'field'}">
+                <t t-if="column.type === 'field'" t-esc="formatAggregateValue(group, column)"/>
+            </td>
+            <t t-set="groupPagerColspan" t-value="getGroupPagerCellColspan(group)"/>
+            <th t-on-keydown="(ev) => this.onCellKeydown(ev, group)" t-if="groupPagerColspan > 0" t-att-colspan="groupPagerColspan"/>
+        </tr>
+    </t>
+
+    <t t-name="web.ListRenderer.RecordRow" owl="1">
+        <tr class="o_data_row"
+            t-att-class="getRowClass(record)"
+            t-att-data-id="record.id"
+            t-on-click.capture="(ev) => this.onClickCapture(record, ev)"
+            t-on-mouseover.capture="(ev) => this.ignoreEventInSelectionMode(ev)"
+            t-on-mouseout.capture="(ev) => this.ignoreEventInSelectionMode(ev)"
+            t-on-mouseenter.capture="(ev) => this.ignoreEventInSelectionMode(ev)"
+            t-on-touchstart="(ev) => this.onRowTouchStart(record, ev)"
+            t-on-touchend="() => this.onRowTouchEnd(record)"
+            t-on-touchmove="() => this.onRowTouchMove(record)"
+        >
+            <td t-on-keydown="(ev) => this.onCellKeydown(ev, group, record)" t-if="hasSelectors" class="o_list_record_selector" t-on-click.stop="() => this.toggleRecordSelection(record)" tabindex="-1">
+                <CheckBox disabled="!canSelectRecord" value="record.selected" onChange.alike="() => this.toggleRecordSelection(record)"/>
+            </td>
+            <t t-foreach="getColumns(record)" t-as="column" t-key="column.id">
+                <t t-if="column.type === 'field'">
+                    <t t-set="isInvisible" t-value="evalModifier(column.modifiers.invisible, record)"/>
+                    <td t-on-keydown="(ev) => this.onCellKeydown(ev, group, record)"
+                        class="o_data_cell cursor-pointer"
+                        t-att-class="getCellClass(column, record)"
+                        t-att-name="column.name"
+                        t-att-colspan="column.colspan"
+                        t-att-data-tooltip="!isInvisible ? getCellTitle(column, record) : false"
+                        data-tooltip-delay="1000"
+                        t-on-click="(ev) => this.onCellClicked(record, column, ev)" tabindex="-1">
+                        <t t-if="!isInvisible">
+                            <t t-if="canUseFormatter(column, record)" t-out="getFormattedValue(column, record)"/>
+                            <Field t-else="" name="column.name" record="record" type="column.widget" class="getFieldClass(column)" fieldInfo="props.archInfo.fieldNodes[column.name]" setDirty="(isDirty) => this.setDirty(isDirty)" readonly="props.activeActions?.edit === false and !record.isNew"/>
+                        </t>
+                    </td>
+                </t>
+                <t t-if="column.type === 'button_group'">
+                    <td t-on-keydown="(ev) => this.onCellKeydown(ev, group, record)" class="o_data_cell cursor-pointer" t-att-class="getCellClass(column, record)" t-on-click="(ev) => this.onButtonCellClicked(record, column, ev)" tabindex="-1">
+                        <t t-foreach="column.buttons" t-as="button" t-key="button.id">
+                            <ViewButton t-if="!evalModifier(button.modifiers.invisible, record)"
+                                className="button.className"
+                                clickParams="button.clickParams"
+                                defaultRank="button.defaultRank"
+                                disabled="button.disabled"
+                                icon="button.icon"
+                                record="record"
+                                string="button.string"
+                                title="button.title"
+                                tabindex="props.list.editedRecord ? '-1' : '0'"
+                                onClick="isX2Many and record.isVirtual ? displaySaveNotification.bind(this) : ''"
+                            />
+                        </t>
+                    </td>
+                </t>
+                <t t-if="column.type === 'widget'">
+                    <td class="o_data_cell" t-att-class="getCellClass(column, record)">
+                        <Widget t-props="column.props" record="record"/>
+                    </td>
+                </t>
+            </t>
+
+            <t t-set="useUnlink" t-value="'unlink' in activeActions" />
+            <t t-set="hasX2ManyAction" t-value="isX2Many and (useUnlink ? activeActions.unlink : activeActions.delete)" />
+            <t t-if="displayOptionalFields or hasX2ManyAction">
+                <t t-if="hasX2ManyAction">
+                    <td class="o_list_record_remove text-center"
+                        t-on-keydown="(ev) => this.onCellKeydown(ev, group, record)"
+                        t-on-click.stop="() => this.onDeleteRecord(record)"
+                        tabindex="-1"
+                    >
+                        <button class="fa"
+                            t-att-class="{
+                                'fa-trash-o': !useUnlink and activeActions.delete,
+                                'fa-times': useUnlink and activeActions.unlink,
+                            }"
+                            name="delete"
+                            aria-label="Delete row"
+                            tabindex="-1"
+                        />
+                    </td>
+                </t>
+                <td t-else="" tabindex="-1" />
+            </t>
+        </tr>
+    </t>
+
+</templates>
+
+```
+
+  </TabItem>
+  <TabItem value="action_service" label="action_service.js">
+
+```javascript title="action_service.js"
+/** @odoo-module **/
+
+import { browser } from "@web/core/browser/browser";
+import { makeContext } from "@web/core/context";
+import { useDebugCategory } from "@web/core/debug/debug_context";
+import { download } from "@web/core/network/download";
+import { evaluateExpr } from "@web/core/py_js/py";
+import { registry } from "@web/core/registry";
+import { KeepLast } from "@web/core/utils/concurrency";
+import { useBus, useService } from "@web/core/utils/hooks";
+import { sprintf } from "@web/core/utils/strings";
+import { cleanDomFromBootstrap } from "@web/legacy/utils";
+import { View, ViewNotFoundError } from "@web/views/view";
+import { ActionDialog } from "./action_dialog";
+import { CallbackRecorder } from "./action_hook";
+import { ReportAction } from "./reports/report_action";
+
+import {
+    Component,
+    markup,
+    onMounted,
+    onWillUnmount,
+    onError,
+    useChildSubEnv,
+    xml,
+    reactive,
+} from "@odoo/owl";
+
+const actionHandlersRegistry = registry.category("action_handlers");
+const actionRegistry = registry.category("actions");
+const viewRegistry = registry.category("views");
+
+/** @typedef {number|false} ActionId */
+/** @typedef {Object} ActionDescription */
+/** @typedef {"current" | "fullscreen" | "new" | "main" | "self" | "inline"} ActionMode */
+/** @typedef {string} ActionTag */
+/** @typedef {string} ActionXMLId */
+/** @typedef {Object} Context */
+/** @typedef {Function} CallableFunction */
+/** @typedef {string} ViewType */
+
+/** @typedef {ActionId|ActionXMLId|ActionTag|ActionDescription} ActionRequest */
+
+/**
+ * @typedef {Object} ActionOptions
+ * @property {Context} [additionalContext]
+ * @property {boolean} [clearBreadcrumbs]
+ * @property {CallableFunction} [onClose]
+ * @property {Object} [props]
+ * @property {ViewType} [viewType]
+ */
+
+export async function clearUncommittedChanges(env) {
+    const callbacks = [];
+    env.bus.trigger("CLEAR-UNCOMMITTED-CHANGES", callbacks);
+    const res = await Promise.all(callbacks.map((fn) => fn()));
+    return !res.includes(false);
+}
+
+function parseActiveIds(ids) {
+    const activeIds = [];
+    if (typeof ids === "string") {
+        activeIds.push(...ids.split(",").map(Number));
+    } else if (typeof ids === "number") {
+        activeIds.push(ids);
+    }
+    return activeIds;
+}
+
+// -----------------------------------------------------------------------------
+// Errors
+// -----------------------------------------------------------------------------
+
+export class ControllerNotFoundError extends Error {}
+
+export class InvalidButtonParamsError extends Error {}
+
+// -----------------------------------------------------------------------------
+// ActionManager (Service)
+// -----------------------------------------------------------------------------
+
+// regex that matches context keys not to forward from an action to another
+const CTX_KEY_REGEX = /^(?:(?:default_|search_default_|show_).+|.+_view_ref|group_by|group_by_no_leaf|active_id|active_ids|orderedBy)$/;
+
+// only register this template once for all dynamic classes ControllerComponent
+const ControllerComponentTemplate = xml`<t t-component="Component" t-props="props"/>`;
+
+function makeActionManager(env) {
+    const keepLast = new KeepLast();
+    let id = 0;
+    let controllerStack = [];
+    let dialogCloseProm;
+    let actionCache = {};
+    let dialog = null;
+    let nextDialog = null;
+
+    // The state action (or default user action if none) is loaded as soon as possible
+    // so that the next "doAction" will have its action ready when needed.
+    const actionParams = _getActionParams();
+    if (actionParams && typeof actionParams.actionRequest === "number") {
+        const { actionRequest, options } = actionParams;
+        _loadAction(actionRequest, options.additionalContext);
+    }
+
+    env.bus.addEventListener("CLEAR-CACHES", () => {
+        actionCache = {};
+    });
+
+    // ---------------------------------------------------------------------------
+    // misc
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Removes the current dialog from the action service's state.
+     * It returns the dialog's onClose callback to be able to propagate it to the next dialog.
+     *
+     * @return {Function|undefined} When there was a dialog, returns its onClose callback for propagation to next dialog.
+     */
+    function _removeDialog() {
+        if (dialog) {
+            const { onClose, remove } = dialog;
+            dialog = null;
+            // Remove the dialog from the dialog_service.
+            // The code is well enough designed to avoid falling in a function call loop.
+            remove();
+            return onClose;
+        }
+    }
+
+    /**
+     * Returns the last controller of the current controller stack.
+     *
+     * @returns {Controller|null}
+     */
+    function _getCurrentController() {
+        const stack = controllerStack;
+        return stack.length ? stack[stack.length - 1] : null;
+    }
+
+    /**
+     * Given an id, xmlid, tag (key of the client action registry) or directly an
+     * object describing an action.
+     *
+     * @private
+     * @param {ActionRequest} actionRequest
+     * @param {Context} [context={}]
+     * @returns {Promise<Action>}
+     */
+    async function _loadAction(actionRequest, context = {}) {
+        if (typeof actionRequest === "string" && actionRegistry.contains(actionRequest)) {
+            // actionRequest is a key in the actionRegistry
+            return {
+                target: "current",
+                tag: actionRequest,
+                type: "ir.actions.client",
+            };
+        }
+
+        if (typeof actionRequest === "string" || typeof actionRequest === "number") {
+            // actionRequest is an id or an xmlid
+            const additional_context = {
+                active_id: context.active_id,
+                active_ids: context.active_ids,
+                active_model: context.active_model,
+            };
+            const key = `${JSON.stringify(actionRequest)},${JSON.stringify(additional_context)}`;
+            let action;
+            if (!actionCache[key]) {
+                actionCache[key] = env.services.rpc("/web/action/load", {
+                    action_id: actionRequest,
+                    additional_context,
+                });
+                action = await actionCache[key];
+                if (action.help) {
+                    action.help = markup(action.help);
+                }
+            } else {
+                action = await actionCache[key];
+            }
+            if (!action) {
+                return {
+                    type: "ir.actions.client",
+                    tag: "invalid_action",
+                    id: actionRequest,
+                };
+            }
+            return Object.assign({}, action);
+        }
+
+        // actionRequest is an object describing the action
+        return actionRequest;
+    }
+
+    /**
+     * this function returns an action description
+     * with a unique jsId.
+     */
+    function _preprocessAction(action, context = {}) {
+        try {
+            action._originalAction = JSON.stringify(action);
+        } catch (_e) {
+            // do nothing, the action might simply not be serializable
+        }
+        action.context = makeContext([context, action.context], env.services.user.context);
+        const domain = action.domain || [];
+        action.domain =
+            typeof domain === "string"
+                ? evaluateExpr(domain, Object.assign({}, env.services.user.context, action.context))
+                : domain;
+        if (action.help) {
+            const htmlHelp = document.createElement("div");
+            htmlHelp.innerHTML = action.help;
+            if (!htmlHelp.innerText.trim()) {
+                delete action.help;
+            }
+        }
+        action = { ...action }; // manipulate a copy to keep cached action unmodified
+        action.jsId = `action_${++id}`;
+        if (action.type === "ir.actions.act_window" || action.type === "ir.actions.client") {
+            action.target = action.target || "current";
+        }
+        if (action.type === "ir.actions.act_window") {
+            action.views = [...action.views.map((v) => [v[0], v[1] === "tree" ? "list" : v[1]])]; // manipulate a copy to keep cached action unmodified
+            action.controllers = {};
+            const target = action.target;
+            if (target !== "inline" && !(target === "new" && action.views[0][1] === "form")) {
+                // FIXME: search view arch is already sent with load_action, so either remove it
+                // from there or load all fieldviews alongside the action for the sake of consistency
+                const searchViewId = action.search_view_id ? action.search_view_id[0] : false;
+                action.views.push([searchViewId, "search"]);
+            }
+        }
+        return action;
+    }
+
+    /**
+     * @private
+     * @param {string} viewType
+     * @throws {Error} if the current controller is not a view
+     * @returns {View | null}
+     */
+    function _getView(viewType) {
+        const currentController = controllerStack[controllerStack.length - 1];
+        if (currentController.action.type !== "ir.actions.act_window") {
+            throw new Error(`switchView called but the current controller isn't a view`);
+        }
+        const view = currentController.views.find((view) => view.type === viewType);
+        return view || null;
+    }
+
+    /**
+     * Given a controller stack, returns the list of breadcrumb items.
+     *
+     * @private
+     * @param {ControllerStack} stack
+     * @returns {Breadcrumbs}
+     */
+    function _getBreadcrumbs(stack) {
+        return stack
+            .filter((controller) => controller.action.tag !== "menu")
+            .map((controller) => {
+                return {
+                    jsId: controller.jsId,
+                    get name() {
+                        return controller.displayName;
+                    },
+                };
+            });
+    }
+
+    /**
+     * @private
+     * @returns {ActionParams | null}
+     */
+    function _getActionParams() {
+        const state = env.services.router.current.hash;
+        const options = { clearBreadcrumbs: true };
+        let actionRequest = null;
+        if (state.action) {
+            // ClientAction
+            if (actionRegistry.contains(state.action)) {
+                actionRequest = {
+                    params: state,
+                    tag: state.action,
+                    type: "ir.actions.client",
+                };
+            } else {
+                // The action to load isn't the current one => executes it
+                actionRequest = state.action;
+                const context = { params: state };
+                if (state.active_id) {
+                    context.active_id = state.active_id;
+                }
+                if (state.active_ids) {
+                    context.active_ids = parseActiveIds(state.active_ids);
+                } else if (state.active_id) {
+                    context.active_ids = [state.active_id];
+                }
+                Object.assign(options, {
+                    additionalContext: context,
+                    viewType: state.view_type,
+                });
+                if (state.id) {
+                    options.props = { resId: state.id };
+                }
+            }
+        } else if (state.model) {
+            if (state.id) {
+                actionRequest = {
+                    res_model: state.model,
+                    res_id: state.id,
+                    type: "ir.actions.act_window",
+                    views: [[state.view_id ? state.view_id : false, "form"]],
+                };
+            } else if (state.view_type) {
+                // This is a window action on a multi-record view => restores it from
+                // the session storage
+                const storedAction = browser.sessionStorage.getItem("current_action");
+                const lastAction = JSON.parse(storedAction || "{}");
+                if (lastAction.help) {
+                    lastAction.help = markup(lastAction.help);
+                }
+                if (lastAction.res_model === state.model) {
+                    if (lastAction.context) {
+                        // If this method is called because of a company switch, the
+                        // stored allowed_company_ids is incorrect.
+                        delete lastAction.context.allowed_company_ids;
+                    }
+                    actionRequest = lastAction;
+                    options.viewType = state.view_type;
+                }
+            }
+        }
+        // If no action => falls back on the user default action (if any).
+        if (!actionRequest && env.services.user.home_action_id) {
+            actionRequest = env.services.user.home_action_id;
+        }
+        return actionRequest ? { actionRequest, options } : null;
+    }
+
+    /**
+     * @param {ClientAction} action
+     * @param {Object} props
+     * @returns {{ props: ActionProps, config: Config }}
+     */
+    function _getActionInfo(action, props) {
+        return {
+            props: Object.assign({}, props, { action, actionId: action.id }),
+            config: {
+                actionId: action.id,
+                actionType: "ir.actions.client",
+                actionFlags: action.flags,
+            },
+            displayName: action.display_name || action.name || "",
+        };
+    }
+
+    /**
+     * @param {Action} action
+     * @returns {ActionMode}
+     */
+    function _getActionMode(action) {
+        if (action.target === "new") {
+            // No possible override for target="new"
+            return "new";
+        }
+        if (action.type === "ir.actions.client") {
+            const clientAction = actionRegistry.get(action.tag);
+            if (clientAction.target) {
+                // Target is forced by the definition of the client action
+                return clientAction.target;
+            }
+        }
+        if (controllerStack.some((c) => c.action.target === "fullscreen")) {
+            // Force fullscreen when one of the controllers is set to fullscreen
+            return "fullscreen";
+        }
+        // Default: current
+        return "current";
+    }
+
+    /**
+     * @private
+     * @returns {SwitchViewParams | null}
+     */
+    function _getSwitchViewParams() {
+        const state = env.services.router.current.hash;
+        if (state.action && !actionRegistry.contains(state.action)) {
+            const currentController = controllerStack[controllerStack.length - 1];
+            const currentActionId =
+                currentController && currentController.action && currentController.action.id;
+            // Window Action: determines model, viewType etc....
+            if (
+                currentController &&
+                currentController.action.type === "ir.actions.act_window" &&
+                currentActionId === state.action
+            ) {
+                const props = {
+                    resId: state.id || false,
+                };
+                const viewType = state.view_type || currentController.view.type;
+                return { viewType, props };
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @param {BaseView} view
+     * @param {ActWindowAction} action
+     * @param {BaseView[]} views
+     * @param {Object} props
+     * @returns {{ props: ViewProps, config: Config }}
+     */
+    function _getViewInfo(view, action, views, props = {}) {
+        const target = action.target;
+        const viewSwitcherEntries = views
+            .filter((v) => v.multiRecord === view.multiRecord)
+            .map((v) => {
+                const viewSwitcherEntry = {
+                    icon: v.icon,
+                    name: v.display_name.toString(),
+                    type: v.type,
+                    multiRecord: v.multiRecord,
+                    accessKey: v.accessKey,
+                };
+                if (view.type === v.type) {
+                    viewSwitcherEntry.active = true;
+                }
+                return viewSwitcherEntry;
+            });
+        const context = action.context || {};
+        let groupBy = context.group_by || [];
+        if (typeof groupBy === "string") {
+            groupBy = [groupBy];
+        }
+        const viewProps = Object.assign({}, props, {
+            context,
+            display: { mode: target === "new" ? "inDialog" : target },
+            domain: action.domain || [],
+            groupBy,
+            loadActionMenus: target !== "new" && target !== "inline",
+            loadIrFilters: action.views.some((v) => v[1] === "search"),
+            resModel: action.res_model,
+            type: view.type,
+            selectRecord: async (resId, { activeIds, mode }) => {
+                if (target !== "new" && _getView("form")) {
+                    await switchView("form", { mode, resId, resIds: activeIds });
+                }
+            },
+            createRecord: async () => {
+                if (target !== "new" && _getView("form")) {
+                    await switchView("form", { resId: false });
+                }
+            },
+        });
+
+        if (view.type === "form") {
+            if (action.target === "new") {
+                viewProps.mode = "edit";
+                if (!viewProps.onSave) {
+                    viewProps.onSave = (record, params) => {
+                        if (params && params.closable) {
+                            doAction({ type: "ir.actions.act_window_close" });
+                        }
+                    };
+                }
+            } else if (context.form_view_initial_mode) {
+                viewProps.mode = context.form_view_initial_mode;
+            }
+            if (action.flags && "mode" in action.flags) {
+                viewProps.mode = action.flags.mode;
+            }
+        }
+
+        if (target === "inline") {
+            viewProps.searchMenuTypes = [];
+        }
+
+        const specialKeys = ["help", "useSampleModel", "limit", "count"];
+        for (const key of specialKeys) {
+            if (key in action) {
+                if (key === "help") {
+                    viewProps.noContentHelp = action.help;
+                } else {
+                    viewProps[key] = action[key];
+                }
+            }
+        }
+
+        if (context.search_disable_custom_filters) {
+            viewProps.activateFavorite = false;
+        }
+
+        // view specific
+        if (action.res_id && !viewProps.resId) {
+            viewProps.resId = action.res_id;
+        }
+
+        // LEGACY CODE COMPATIBILITY: remove when all views will be written in owl
+        if (view.isLegacy) {
+            const legacyActionInfo = { ...action, ...viewProps.action };
+            Object.assign(viewProps, {
+                action: legacyActionInfo,
+                View: view,
+                views: action.views,
+            });
+        }
+        // END LEGACY CODE COMPATIBILITY
+
+        viewProps.noBreadcrumbs = action.context.no_breadcrumbs;
+        delete action.context.no_breadcrumbs;
+        return {
+            props: viewProps,
+            config: {
+                actionId: action.id,
+                actionType: "ir.actions.act_window",
+                actionFlags: action.flags,
+                views: action.views,
+                viewSwitcherEntries,
+            },
+            displayName: action.display_name || action.name || "",
+        };
+    }
+
+    /**
+     * Computes the position of the controller in the nextStack according to options
+     * @param {Object} options
+     * @param {boolean} [options.clearBreadcrumbs=false]
+     * @param {'replaceLast' | 'replaceLastAction'} [options.stackPosition]
+     * @param {number} [options.index]
+     */
+    function _computeStackIndex(options) {
+        let index = null;
+        if (options.clearBreadcrumbs) {
+            index = 0;
+        } else if (options.stackPosition === "replaceCurrentAction") {
+            const currentController = controllerStack[controllerStack.length - 1];
+            if (currentController) {
+                index = controllerStack.findIndex(
+                    (ct) => ct.action.jsId === currentController.action.jsId
+                );
+            }
+        } else if (options.stackPosition === "replacePreviousAction") {
+            let last;
+            for (let i = controllerStack.length - 1; i >= 0; i--) {
+                const action = controllerStack[i].action.jsId;
+                if (!last) {
+                    last = action;
+                }
+                if (action !== last) {
+                    last = action;
+                    break;
+                }
+            }
+            if (last) {
+                index = controllerStack.findIndex((ct) => ct.action.jsId === last);
+            }
+            // TODO: throw if there is no previous action?
+        } else if ("index" in options) {
+            index = options.index;
+        } else {
+            index = controllerStack.length;
+        }
+        return index;
+    }
+
+    /**
+     * Triggers a re-rendering with respect to the given controller.
+     *
+     * @private
+     * @param {Controller} controller
+     * @param {UpdateStackOptions} options
+     * @param {boolean} [options.clearBreadcrumbs=false]
+     * @param {number} [options.index]
+     * @returns {Promise<Number>}
+     */
+    async function _updateUI(controller, options = {}) {
+        let resolve;
+        let reject;
+        let dialogCloseResolve;
+        const currentActionProm = new Promise((_res, _rej) => {
+            resolve = _res;
+            reject = _rej;
+        });
+        const action = controller.action;
+        const index = _computeStackIndex(options);
+        const controllerArray = [controller];
+        if (options.lazyController) {
+            controllerArray.unshift(options.lazyController);
+        }
+        const nextStack = controllerStack.slice(0, index).concat(controllerArray);
+        // Compute breadcrumbs
+        controller.config.breadcrumbs = reactive(
+            action.target === "new" ? [] : _getBreadcrumbs(nextStack)
+        );
+        controller.config.getDisplayName = () => controller.displayName;
+        controller.config.setDisplayName = (displayName) => {
+            controller.displayName = displayName;
+            if (controller === _getCurrentController()) {
+                // if not mounted yet, will be done in "mounted"
+                env.services.title.setParts({ action: controller.displayName });
+            }
+            if (action.target !== "new") {
+                // This is a hack to force the reactivity when a new displayName is set
+                controller.config.breadcrumbs.push(undefined);
+                controller.config.breadcrumbs.pop();
+            }
+        };
+        controller.config.historyBack = () => {
+            const previousController = controllerStack[controllerStack.length - 2];
+            if (previousController && !dialog) {
+                restore(previousController.jsId);
+            } else {
+                _executeCloseAction();
+            }
+        };
+
+        class ControllerComponent extends Component {
+            setup() {
+                this.Component = controller.Component;
+                this.titleService = useService("title");
+                useDebugCategory("action", { action });
+                useChildSubEnv({
+                    config: controller.config,
+                });
+                if (action.target !== "new") {
+                    this.__beforeLeave__ = new CallbackRecorder();
+                    this.__getGlobalState__ = new CallbackRecorder();
+                    this.__getLocalState__ = new CallbackRecorder();
+                    useBus(env.bus, "CLEAR-UNCOMMITTED-CHANGES", (ev) => {
+                        const callbacks = ev.detail;
+                        const beforeLeaveFns = this.__beforeLeave__.callbacks;
+                        callbacks.push(...beforeLeaveFns);
+                    });
+                    useChildSubEnv({
+                        __beforeLeave__: this.__beforeLeave__,
+                        __getGlobalState__: this.__getGlobalState__,
+                        __getLocalState__: this.__getLocalState__,
+                    });
+                }
+                this.isMounted = false;
+
+                onMounted(this.onMounted);
+                onWillUnmount(this.onWillUnmount);
+                onError(this.onError);
+            }
+            onError(error) {
+                reject(error);
+                cleanDomFromBootstrap();
+                if (action.target === "new") {
+                    // get the dialog service to close the dialog.
+                    throw error;
+                } else {
+                    const lastCt = controllerStack[controllerStack.length - 1];
+                    let info = {};
+                    if (lastCt) {
+                        if (lastCt.jsId === controller.jsId) {
+                            // the error occurred on the controller which is
+                            // already in the DOM, so simply show the error
+                            Promise.resolve().then(() => {
+                                throw error;
+                            });
+                        } else {
+                            info = lastCt.__info__;
+                            // the error occurred while rendering a new controller,
+                            // so go back to the last non faulty controller
+                            // (the error will be shown anyway as the promise
+                            // has been rejected)
+                            restore(lastCt.jsId);
+                        }
+                        return;
+                    }
+                    env.bus.trigger("ACTION_MANAGER:UPDATE", info);
+                }
+            }
+            onMounted() {
+                if (action.target === "new") {
+                    dialogCloseProm = new Promise((_r) => {
+                        dialogCloseResolve = _r;
+                    }).then(() => {
+                        dialogCloseProm = undefined;
+                    });
+                    dialog = nextDialog;
+                } else {
+                    controller.getGlobalState = () => {
+                        const exportFns = this.__getGlobalState__.callbacks;
+                        if (exportFns.length) {
+                            return Object.assign({}, ...exportFns.map((fn) => fn()));
+                        }
+                    };
+                    controller.getLocalState = () => {
+                        const exportFns = this.__getLocalState__.callbacks;
+                        if (exportFns.length) {
+                            return Object.assign({}, ...exportFns.map((fn) => fn()));
+                        }
+                    };
+
+                    // LEGACY CODE COMPATIBILITY: remove when controllers will be written in owl
+                    // we determine here which actions no longer occur in the nextStack,
+                    // and we manually destroy all their controller's widgets
+                    const nextStackActionIds = nextStack.map((c) => c.action.jsId);
+                    const toDestroy = new Set();
+                    for (const c of controllerStack) {
+                        if (!nextStackActionIds.includes(c.action.jsId)) {
+                            if (c.action.type === "ir.actions.act_window") {
+                                for (const viewType in c.action.controllers) {
+                                    const controller = c.action.controllers[viewType];
+                                    if (controller.view.isLegacy) {
+                                        toDestroy.add(controller);
+                                    }
+                                }
+                            } else {
+                                toDestroy.add(c);
+                            }
+                        }
+                    }
+                    for (const c of toDestroy) {
+                        if (c.exportedState && c.exportedState.__legacy_widget__) {
+                            c.exportedState.__legacy_widget__.destroy();
+                        }
+                    }
+                    // END LEGACY CODE COMPATIBILITY
+                    controllerStack = nextStack; // the controller is mounted, commit the new stack
+                    pushState(controller);
+                    this.titleService.setParts({ action: controller.displayName });
+                    browser.sessionStorage.setItem(
+                        "current_action",
+                        action._originalAction || "{}"
+                    );
+                }
+                resolve();
+                env.bus.trigger("ACTION_MANAGER:UI-UPDATED", _getActionMode(action));
+                this.isMounted = true;
+            }
+            onWillUnmount() {
+                if (action.target === "new" && dialogCloseResolve) {
+                    dialogCloseResolve();
+                }
+            }
+        }
+        ControllerComponent.template = ControllerComponentTemplate;
+        ControllerComponent.Component = controller.Component;
+
+        if (action.target === "new") {
+            cleanDomFromBootstrap();
+            const actionDialogProps = {
+                // TODO add size
+                ActionComponent: ControllerComponent,
+                actionProps: controller.props,
+                actionType: action.type,
+            };
+            if (action.name) {
+                actionDialogProps.title = action.name;
+            }
+
+            const onClose = _removeDialog();
+            const removeDialog = env.services.dialog.add(ActionDialog, actionDialogProps, {
+                onClose: () => {
+                    const onClose = _removeDialog();
+                    if (onClose) {
+                        onClose();
+                    }
+                    cleanDomFromBootstrap();
+                },
+            });
+            if (nextDialog) {
+                nextDialog.remove();
+            }
+            nextDialog = {
+                remove: removeDialog,
+                onClose: onClose || options.onClose,
+            };
+            return currentActionProm;
+        }
+
+        const currentController = _getCurrentController();
+        if (currentController && currentController.getLocalState) {
+            currentController.exportedState = currentController.getLocalState();
+        }
+        if (controller.exportedState) {
+            controller.props.state = controller.exportedState;
+        }
+
+        // TODO DAM Remarks:
+        // this thing seems useless for client actions.
+        // restore and switchView (at least) use this --> cannot be done in switchView only
+        // if prop globalState has been passed in doAction, since the action is new the prop won't be overridden in l655.
+        // if globalState is not useful for client actions --> maybe use that thing in useSetupView instead of useSetupAction?
+        // a good thing: the Object.assign seems to reflect the use of "externalState" in legacy Model class --> things should be fine.
+        if (currentController && currentController.getGlobalState) {
+            currentController.action.globalState = Object.assign(
+                {},
+                currentController.action.globalState,
+                currentController.getGlobalState() // what if this = {}?
+            );
+        }
+        if (controller.action.globalState) {
+            controller.props.globalState = controller.action.globalState;
+        }
+
+        const closingProm = _executeCloseAction();
+
+        controller.__info__ = {
+            id: ++id,
+            Component: ControllerComponent,
+            componentProps: controller.props,
+        };
+        env.services.dialog.closeAll();
+        env.bus.trigger("ACTION_MANAGER:UPDATE", controller.__info__);
+        return Promise.all([currentActionProm, closingProm]).then((r) => r[0]);
+    }
+
+    // ---------------------------------------------------------------------------
+    // ir.actions.act_url
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Executes actions of type 'ir.actions.act_url', i.e. redirects to the
+     * given url.
+     *
+     * @private
+     * @param {ActURLAction} action
+     * @param {ActionOptions} options
+     */
+    function _executeActURLAction(action, options) {
+        let url = action.url;
+        if (url && !(url.startsWith("http") || url.startsWith("/"))) {
+            url = "/" + url;
+        }
+        if (action.target === "self") {
+            env.services.router.redirect(url);
+        } else {
+            const w = browser.open(url, "_blank");
+            if (!w || w.closed || typeof w.closed === "undefined") {
+                const msg = env._t(
+                    "A popup window has been blocked. You may need to change your " +
+                        "browser settings to allow popup windows for this page."
+                );
+                env.services.notification.add(msg, {
+                    sticky: true,
+                    type: "warning",
+                });
+            }
+            if (options.onClose) {
+                options.onClose();
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // ir.actions.act_window
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Executes an action of type 'ir.actions.act_window'.
+     *
+     * @private
+     * @param {ActWindowAction} action
+     * @param {ActionOptions} options
+     */
+    async function _executeActWindowAction(action, options) {
+        // LEGACY CODE COMPATIBILITY: load views to determine js_class if any, s.t.
+        // we know if the view to use is legacy or not
+        // When all views will be converted, this will be done exclusively by View
+        // #action-serv-leg-compat-js-class
+        const loadViewParams = {
+            context: action.context || {},
+            views: action.views,
+            resModel: action.res_model,
+        };
+        const loadViewOptions = {
+            actionId: action.id,
+            loadActionMenus: action.target !== "new" && action.target !== "inline",
+            loadIrFilters: action.views.some((v) => v[1] === "search"),
+        };
+        const prom = env.services.view.loadViews(loadViewParams, loadViewOptions);
+        const { views: viewDescriptions } = await keepLast.add(prom);
+        const domParser = new DOMParser();
+        const views = [];
+        for (const [, type] of action.views) {
+            if (type !== "search") {
+                const arch = viewDescriptions[type].arch;
+                const archDoc = domParser.parseFromString(arch, "text/xml").documentElement;
+                const jsClass = archDoc.getAttribute("js_class");
+                const view = viewRegistry.get(jsClass, false) || viewRegistry.get(type, false);
+                if (view) {
+                    views.push(view);
+                }
+            }
+        }
+        // END LEGACY CODE COMPATIBILITY
+        // const views = [];
+        // for (const [, type] of action.views) {
+        //     if (type !== "search" && viewRegistry.contains(type)) {
+        //         views.push(viewRegistry.get(key));
+        //     }
+        // }
+        if (!views.length) {
+            throw new Error(`No view found for act_window action ${action.id}`);
+        }
+
+        let view = options.viewType && views.find((v) => v.type === options.viewType);
+        let lazyView;
+
+        if (view && !view.multiRecord) {
+            lazyView = views[0].multiRecord ? views[0] : undefined;
+        } else if (!view) {
+            view = views[0];
+        }
+
+        if (env.isSmall) {
+            if (!view.isMobileFriendly) {
+                view = _findMobileView(views, view.multiRecord) || view;
+            }
+            if (lazyView && !lazyView.isMobileFriendly) {
+                lazyView = _findMobileView(views, lazyView.multiRecord) || lazyView;
+            }
+        }
+
+        const controller = {
+            jsId: `controller_${++id}`,
+            Component: view.isLegacy ? view.Controller : View,
+            action,
+            view,
+            views,
+            ..._getViewInfo(view, action, views, options.props),
+        };
+        action.controllers[view.type] = controller;
+
+        const updateUIOptions = {
+            clearBreadcrumbs: options.clearBreadcrumbs,
+            onClose: options.onClose,
+            stackPosition: options.stackPosition,
+        };
+
+        if (lazyView) {
+            updateUIOptions.lazyController = {
+                jsId: `controller_${++id}`,
+                Component: lazyView.isLegacy ? lazyView.Controller : View,
+                action,
+                view: lazyView,
+                views,
+                ..._getViewInfo(lazyView, action, views),
+            };
+        }
+
+        return _updateUI(controller, updateUIOptions);
+    }
+
+    /**
+     * Helper function to find the first mobile-friendly view, if any.
+     *
+     * @private
+     * @param {Array} views an array of views
+     * @param {boolean} multiRecord true if we search for a multiRecord view
+     * @returns {Object|undefined} first mobile-friendly view found
+     */
+    function _findMobileView(views, multiRecord) {
+        return views.find((view) => view.isMobileFriendly && view.multiRecord === multiRecord);
+    }
+
+    // ---------------------------------------------------------------------------
+    // ir.actions.client
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Executes an action of type 'ir.actions.client'.
+     *
+     * @private
+     * @param {ClientAction} action
+     * @param {ActionOptions} options
+     */
+    async function _executeClientAction(action, options) {
+        const clientAction = actionRegistry.get(action.tag);
+        if (clientAction.prototype instanceof Component) {
+            if (action.target !== "new") {
+                const canProceed = await clearUncommittedChanges(env);
+                if (!canProceed) {
+                    return;
+                }
+                if (clientAction.target) {
+                    action.target = clientAction.target;
+                }
+            }
+            const controller = {
+                jsId: `controller_${++id}`,
+                Component: clientAction,
+                action,
+                ..._getActionInfo(action, options.props),
+            };
+            return _updateUI(controller, {
+                clearBreadcrumbs: options.clearBreadcrumbs,
+                stackPosition: options.stackPosition,
+                onClose: options.onClose,
+            });
+        } else {
+            const next = await clientAction(env, action);
+            if (next) {
+                return doAction(next, options);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // ir.actions.report
+    // ---------------------------------------------------------------------------
+
+    // messages that might be shown to the user dependening on the state of wkhtmltopdf
+    const link = '<br><br><a href="http://wkhtmltopdf.org/" target="_blank">wkhtmltopdf.org</a>';
+    const WKHTMLTOPDF_MESSAGES = {
+        broken:
+            env._t(
+                "Your installation of Wkhtmltopdf seems to be broken. The report will be shown " +
+                    "in html."
+            ) + link,
+        install:
+            env._t(
+                "Unable to find Wkhtmltopdf on this system. The report will be shown in " + "html."
+            ) + link,
+        upgrade:
+            env._t(
+                "You should upgrade your version of Wkhtmltopdf to at least 0.12.0 in order to " +
+                    "get a correct display of headers and footers as well as support for " +
+                    "table-breaking between pages."
+            ) + link,
+        workers: env._t(
+            "You need to start Odoo with at least two workers to print a pdf version of " +
+                "the reports."
+        ),
+    };
+
+    // only check the wkhtmltopdf state once, so keep the rpc promise
+    let wkhtmltopdfStateProm;
+
+    /**
+     * Generates the report url given a report action.
+     *
+     * @private
+     * @param {ReportAction} action
+     * @param {ReportType} type
+     * @returns {string}
+     */
+    function _getReportUrl(action, type) {
+        let url = `/report/${type}/${action.report_name}`;
+        const actionContext = action.context || {};
+        if (action.data && JSON.stringify(action.data) !== "{}") {
+            // build a query string with `action.data` (it's the place where reports
+            // using a wizard to customize the output traditionally put their options)
+            const options = encodeURIComponent(JSON.stringify(action.data));
+            const context = encodeURIComponent(JSON.stringify(actionContext));
+            url += `?options=${options}&context=${context}`;
+        } else {
+            if (actionContext.active_ids) {
+                url += `/${actionContext.active_ids.join(",")}`;
+            }
+            if (type === "html") {
+                const context = encodeURIComponent(JSON.stringify(env.services.user.context));
+                url += `?context=${context}`;
+            }
+        }
+        return url;
+    }
+
+    /**
+     * Launches download action of the report
+     *
+     * @private
+     * @param {ReportAction} action
+     * @param {ActionOptions} options
+     * @returns {Promise}
+     */
+    async function _triggerDownload(action, options, type) {
+        const url = _getReportUrl(action, type);
+        env.services.ui.block();
+        try {
+            await download({
+                url: "/report/download",
+                data: {
+                    data: JSON.stringify([url, action.report_type]),
+                    context: JSON.stringify(env.services.user.context),
+                },
+            });
+        } finally {
+            env.services.ui.unblock();
+        }
+        const onClose = options.onClose;
+        if (action.close_on_report_download) {
+            return doAction({ type: "ir.actions.act_window_close" }, { onClose });
+        } else if (onClose) {
+            onClose();
+        }
+    }
+
+    function _executeReportClientAction(action, options) {
+        const props = Object.assign({}, options.props, {
+            data: action.data,
+            display_name: action.display_name,
+            name: action.name,
+            report_file: action.report_file,
+            report_name: action.report_name,
+            report_url: _getReportUrl(action, "html"),
+            context: Object.assign({}, action.context),
+        });
+
+        const controller = {
+            jsId: `controller_${++id}`,
+            Component: ReportAction,
+            action,
+            ..._getActionInfo(action, props),
+        };
+
+        return _updateUI(controller, {
+            clearBreadcrumbs: options.clearBreadcrumbs,
+            stackPosition: options.stackPosition,
+            onClose: options.onClose,
+        });
+    }
+
+    /**
+     * Executes actions of type 'ir.actions.report'.
+     *
+     * @private
+     * @param {ReportAction} action
+     * @param {ActionOptions} options
+     */
+    async function _executeReportAction(action, options) {
+        const handlers = registry.category("ir.actions.report handlers").getAll();
+        for (const handler of handlers) {
+            const result = await handler(action, options, env);
+            if (result) {
+                return result;
+            }
+        }
+        if (action.report_type === "qweb-html") {
+            return _executeReportClientAction(action, options);
+        } else if (action.report_type === "qweb-pdf") {
+            // check the state of wkhtmltopdf before proceeding
+            if (!wkhtmltopdfStateProm) {
+                wkhtmltopdfStateProm = env.services.rpc("/report/check_wkhtmltopdf");
+            }
+            const state = await wkhtmltopdfStateProm;
+            // display a notification according to wkhtmltopdf's state
+            if (state in WKHTMLTOPDF_MESSAGES) {
+                env.services.notification.add(WKHTMLTOPDF_MESSAGES[state], {
+                    sticky: true,
+                    title: env._t("Report"),
+                });
+            }
+            if (state === "upgrade" || state === "ok") {
+                // trigger the download of the PDF report
+                return _triggerDownload(action, options, "pdf");
+            } else {
+                // open the report in the client action if generating the PDF is not possible
+                return _executeReportClientAction(action, options);
+            }
+        } else if (action.report_type === "qweb-text") {
+            return _triggerDownload(action, options, "text");
+        } else {
+            console.error(
+                `The ActionManager can't handle reports of type ${action.report_type}`,
+                action
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // ir.actions.server
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Executes an action of type 'ir.actions.server'.
+     *
+     * @private
+     * @param {ServerAction} action
+     * @param {ActionOptions} options
+     * @returns {Promise<void>}
+     */
+    async function _executeServerAction(action, options) {
+        const runProm = env.services.rpc("/web/action/run", {
+            action_id: action.id,
+            context: makeContext([env.services.user.context, action.context]),
+        });
+        let nextAction = await keepLast.add(runProm);
+        if (nextAction.help) {
+            nextAction.help = markup(nextAction.help);
+        }
+        nextAction = nextAction || { type: "ir.actions.act_window_close" };
+        return doAction(nextAction, options);
+    }
+
+    async function _executeCloseAction(params = {}) {
+        let onClose;
+        if (dialog) {
+            onClose = _removeDialog();
+        } else {
+            onClose = params.onClose;
+        }
+        if (onClose) {
+            await onClose(params.onCloseInfo);
+        }
+
+        return dialogCloseProm;
+    }
+
+    // ---------------------------------------------------------------------------
+    // public API
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Main entry point of a 'doAction' request. Loads the action and executes it.
+     *
+     * @param {ActionRequest} actionRequest
+     * @param {ActionOptions} options
+     * @returns {Promise<number | undefined | void>}
+     */
+    async function doAction(actionRequest, options = {}) {
+        const actionProm = _loadAction(actionRequest, options.additionalContext);
+        let action = await keepLast.add(actionProm);
+        action = _preprocessAction(action, options.additionalContext);
+        options.clearBreadcrumbs = action.target === "main" || options.clearBreadcrumbs;
+        switch (action.type) {
+            case "ir.actions.act_url":
+                return _executeActURLAction(action, options);
+            case "ir.actions.act_window":
+                if (action.target !== "new") {
+                    const canProceed = await clearUncommittedChanges(env);
+                    if (!canProceed) {
+                        return new Promise(() => {});
+                    }
+                }
+                return _executeActWindowAction(action, options);
+            case "ir.actions.act_window_close":
+                return _executeCloseAction({ onClose: options.onClose, onCloseInfo: action.infos });
+            case "ir.actions.client":
+                return _executeClientAction(action, options);
+            case "ir.actions.report":
+                return _executeReportAction(action, options);
+            case "ir.actions.server":
+                return _executeServerAction(action, options);
+            default: {
+                const handler = actionHandlersRegistry.get(action.type, null);
+                if (handler !== null) {
+                    return handler({ env, action, options });
+                }
+                throw new Error(
+                    `The ActionManager service can't handle actions of type ${action.type}`
+                );
+            }
+        }
+    }
+
+    /**
+     * Executes an action on top of the current one (typically, when a button in a
+     * view is clicked). The button may be of type 'object' (call a given method
+     * of a given model) or 'action' (execute a given action). Alternatively, the
+     * button may have the attribute 'special', and in this case an
+     * 'ir.actions.act_window_close' is executed.
+     *
+     * @param {DoActionButtonParams} params
+     * @returns {Promise<void>}
+     */
+    async function doActionButton(params) {
+        // determine the action to execute according to the params
+        let action;
+        const context = makeContext([params.context, params.buttonContext]);
+        if (params.special) {
+            action = { type: "ir.actions.act_window_close", infos: { special: true } };
+        } else if (params.type === "object") {
+            // call a Python Object method, which may return an action to execute
+            let args = params.resId ? [[params.resId]] : [params.resIds];
+            if (params.args) {
+                let additionalArgs;
+                try {
+                    // warning: quotes and double quotes problem due to json and xml clash
+                    // maybe we should force escaping in xml or do a better parse of the args array
+                    additionalArgs = JSON.parse(params.args.replace(/'/g, '"'));
+                } catch (_e) {
+                    browser.console.error("Could not JSON.parse arguments", params.args);
+                }
+                args = args.concat(additionalArgs);
+            }
+            const callProm = env.services.rpc("/web/dataset/call_button", {
+                args,
+                kwargs: { context },
+                method: params.name,
+                model: params.resModel,
+            });
+            action = await keepLast.add(callProm);
+            action =
+                action && typeof action === "object"
+                    ? action
+                    : { type: "ir.actions.act_window_close" };
+            if (action.help) {
+                action.help = markup(action.help);
+            }
+        } else if (params.type === "action") {
+            // execute a given action, so load it first
+            context.active_id = params.resId || null;
+            context.active_ids = params.resIds;
+            context.active_model = params.resModel;
+            action = await keepLast.add(_loadAction(params.name, context));
+        } else {
+            throw new InvalidButtonParamsError("Missing type for doActionButton request");
+        }
+        // filter out context keys that are specific to the current action, because:
+        //  - wrong default_* and search_default_* values won't give the expected result
+        //  - wrong group_by values will fail and forbid rendering of the destination view
+        const currentCtx = {};
+        for (const key in params.context) {
+            if (key.match(CTX_KEY_REGEX) === null) {
+                currentCtx[key] = params.context[key];
+            }
+        }
+        const activeCtx = { active_model: params.resModel };
+        if (params.resId) {
+            activeCtx.active_id = params.resId;
+            activeCtx.active_ids = [params.resId];
+        }
+        action.context = makeContext([currentCtx, params.buttonContext, activeCtx, action.context]);
+        // in case an effect is returned from python and there is already an effect
+        // attribute on the button, the priority is given to the button attribute
+        const effect = params.effect ? evaluateExpr(params.effect) : action.effect;
+        const options = { onClose: params.onClose };
+        await doAction(action, options);
+        if (params.close) {
+            await _executeCloseAction();
+        }
+        if (effect) {
+            env.services.effect.add(effect);
+        }
+    }
+
+    /**
+     * Switches to the given view type in action of the last controller of the
+     * stack. This action must be of type 'ir.actions.act_window'.
+     *
+     * @param {ViewType} viewType
+     * @param {Object} [props={}]
+     * @throws {ViewNotFoundError} if the viewType is not found on the current action
+     * @returns {Promise<Number>}
+     */
+    async function switchView(viewType, props = {}) {
+        await keepLast.add(Promise.resolve());
+        if (dialog) {
+            // we don't want to switch view when there's a dialog open, as we would
+            // not switch in the correct action (action in background != dialog action)
+            return;
+        }
+        const controller = controllerStack[controllerStack.length - 1];
+        const view = _getView(viewType);
+        if (!view) {
+            throw new ViewNotFoundError(
+                sprintf(
+                    env._t("No view of type '%s' could be found in the current action."),
+                    viewType
+                )
+            );
+        }
+        const newController = controller.action.controllers[viewType] || {
+            jsId: `controller_${++id}`,
+            Component: view.isLegacy ? view.Controller : View,
+            action: controller.action,
+            views: controller.views,
+            view,
+        };
+
+        // LEGACY CODE COMPATIBILITY: remove when controllers will be written in owl
+        if (view.isLegacy && newController.jsId === controller.jsId) {
+            // case where a legacy view is reloaded via the view switcher
+            const { __legacy_widget__ } = controller.getLocalState();
+            const params = {};
+            if ("resId" in props) {
+                params.currentId = props.resId;
+            }
+            return __legacy_widget__.reload(params);
+        }
+        // END LEGACY CODE COMPATIBILITY
+
+        const canProceed = await clearUncommittedChanges(env);
+        if (!canProceed) {
+            return;
+        }
+
+        Object.assign(
+            newController,
+            _getViewInfo(view, controller.action, controller.views, props)
+        );
+        controller.action.controllers[viewType] = newController;
+        let index;
+        if (view.multiRecord) {
+            index = controllerStack.findIndex((ct) => ct.action.jsId === controller.action.jsId);
+            index = index > -1 ? index : controllerStack.length - 1;
+        } else {
+            // This case would mostly happen when loadState detects a change in the URL.
+            // Also, I guess we may need it when we have other monoRecord views
+            index = controllerStack.findIndex(
+                (ct) => ct.action.jsId === controller.action.jsId && !ct.view.multiRecord
+            );
+            index = index > -1 ? index : controllerStack.length;
+        }
+        return _updateUI(newController, { index });
+    }
+
+    /**
+     * Restores a controller from the controller stack given its id. Typically,
+     * this function is called when clicking on the breadcrumbs. If no id is given
+     * restores the previous controller from the stack (penultimate).
+     *
+     * @param {string} jsId
+     */
+    async function restore(jsId) {
+        await keepLast.add(Promise.resolve());
+        let index;
+        if (!jsId) {
+            index = controllerStack.length - 2;
+        } else {
+            index = controllerStack.findIndex((controller) => controller.jsId === jsId);
+        }
+        if (index < 0) {
+            const msg = jsId ? "Invalid controller to restore" : "No controller to restore";
+            throw new ControllerNotFoundError(msg);
+        }
+        const canProceed = await clearUncommittedChanges(env);
+        if (!canProceed) {
+            return;
+        }
+        const controller = controllerStack[index];
+        if (controller.action.type === "ir.actions.act_window") {
+            const { action, exportedState, view, views } = controller;
+            const props = { ...controller.props };
+            if (exportedState && "resId" in exportedState) {
+                // When restoring, we want to use the last exported ID of the controller
+                props.resId = exportedState.resId;
+            }
+            Object.assign(controller, _getViewInfo(view, action, views, props));
+        }
+        return _updateUI(controller, { index });
+    }
+
+    /**
+     * Performs a "doAction" or a "switchView" according to the current content of
+     * the URL. The id of the underlying action is be returned if one of these
+     * operations has successfully started.
+     *
+     * @returns {Promise<boolean>} true iff the state could have been loaded
+     */
+    async function loadState() {
+        const switchViewParams = _getSwitchViewParams();
+        if (switchViewParams) {
+            // only when we already have an action in dom
+            const { viewType, props } = switchViewParams;
+            const view = _getView(viewType);
+            if (view) {
+                // Params valid and view found => performs a "switchView"
+                await switchView(viewType, props);
+                return true;
+            }
+        } else {
+            const actionParams = _getActionParams();
+            if (actionParams) {
+                // Params valid => performs a "doAction"
+                const { actionRequest, options } = actionParams;
+                await doAction(actionRequest, options);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function pushState(controller) {
+        const newState = {};
+        const action = controller.action;
+        if (action.id) {
+            newState.action = action.id;
+        } else if (action.type === "ir.actions.client") {
+            newState.action = action.tag;
+        }
+        if (action.context) {
+            const activeId = action.context.active_id;
+            if (activeId) {
+                newState.active_id = activeId;
+            }
+            const activeIds = action.context.active_ids;
+            // we don't push active_ids if it's a single element array containing
+            // the active_id to make the url shorter in most cases
+            if (activeIds && !(activeIds.length === 1 && activeIds[0] === activeId)) {
+                newState.active_ids = activeIds.join(",");
+            }
+        }
+        if (action.type === "ir.actions.act_window") {
+            const props = controller.props;
+            newState.model = props.resModel;
+            newState.view_type = props.type;
+            newState.id = props.resId || (props.state && props.state.resId) || undefined;
+        }
+        env.services.router.pushState(newState, { replace: true });
+    }
+    return {
+        doAction,
+        doActionButton,
+        switchView,
+        restore,
+        loadState,
+        async loadAction(actionRequest, context) {
+            const action = await _loadAction(actionRequest, context);
+            return _preprocessAction(action, context);
+        },
+        get currentController() {
+            return _getCurrentController();
+        },
+        __legacy__isActionInStack(actionId) {
+            return controllerStack.find((c) => c.action.jsId === actionId);
+        },
+    };
+}
+
+export const actionService = {
+    dependencies: [
+        "effect",
+        "localization",
+        "notification",
+        "router",
+        "rpc",
+        "title",
+        "view", // for legacy view compatibility #action-serv-leg-compat-js-class
+        "ui",
+        "user",
+        "dialog",
+    ],
+    start(env) {
+        return makeActionManager(env);
+    },
+};
+
+registry.category("services").add("action", actionService);
+
+```
+
+  </TabItem>
+</Tabs>
