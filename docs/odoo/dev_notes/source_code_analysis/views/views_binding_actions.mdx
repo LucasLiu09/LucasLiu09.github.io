@@ -1,0 +1,2261 @@
+---
+title: Views绑定动作Actions
+description: Views绑定动作Actions的源码溯源
+sidebar_label: Views绑定动作Actions
+keyword:
+    - odoo
+    - odoo development
+tags: [odoo]
+last_update:
+  date: 2025/11/7
+  author: Lucas
+---
+
+import Tabs from '@theme/Tabs';
+
+import TabItem from '@theme/TabItem';
+
+# Views绑定动作Actions的源码溯源
+
+> 本文中示例均为代码片段，完整代码见底部。
+
+本章节以list视图为例，查看其绑定动作Actions的源码。
+
+## ListView
+
+首先来看`web.ListView`模板，关于动作菜单的部分，模板中在`solt="control-panel-bottom-left"`中使用了[`ActionMenus`组件](../components/action_menus_analyze.mdx)。
+
+关于动作菜单的渲染均在`ActionMenus`组件中完成，所有`items`便是通过`props`传入。可以看到这里props的items来源于`getActionMenuItems()`方法。
+
+```xml title="list_controller.xml"
+<t t-name="web.ListView" owl="1">
+    <!-- ... -->
+    <t t-set-slot="control-panel-bottom-left">
+        <t t-if="props.info.actionMenus and model.root.selection.length">
+            <ActionMenus
+                getActiveIds="() => model.root.selection.map((r) => r.resId)"
+                context="props.context"
+                domain="props.domain"
+                items="getActionMenuItems()"
+                isDomainSelected="model.root.isDomainSelected"
+                resModel="model.root.resModel"
+                onActionExecuted="() => model.load()"/>
+        </t>
+    </t>
+    <!-- ... -->
+</t>
+```
+
+`ActionMenus`的items主要分为以下类别：
+- `printItems`: 取值于`props.items.print`.
+- `actionItems`:
+    - `callbackActions`: 取值于`props.items.other`.
+    - `formattedActions`: 取值于`props.items.action`.
+    - `registryActions`: 取值于`registry.category("action_menus").getAll()`.
+
+在`getActionMenuItems()`中可以看到，items主要由`props.info.actionMenus`和`otherActionItems`组成。
+
+<details>
+    <summary>getActionMenuItems()</summary>
+
+```javascript title="list_controller.js"
+export class ListController extends Component{
+    // ...
+    getActionMenuItems() {
+        const isM2MGrouped = this.model.root.isM2MGrouped;
+        const otherActionItems = [];
+        if (this.isExportEnable) {
+            otherActionItems.push({
+                key: "export",
+                description: this.env._t("Export"),
+                callback: () => this.onExportData(),
+            });
+        }
+        if (this.archiveEnabled && !isM2MGrouped) {
+            otherActionItems.push({
+                key: "archive",
+                description: this.env._t("Archive"),
+                callback: () => {
+                    const dialogProps = {
+                        body: this.env._t(
+                            "Are you sure that you want to archive all the selected records?"
+                        ),
+                        confirmLabel: this.env._t("Archive"),
+                        confirm: () => {
+                            this.toggleArchiveState(true);
+                        },
+                        cancel: () => {},
+                    };
+                    this.dialogService.add(ConfirmationDialog, dialogProps);
+                },
+            });
+            otherActionItems.push({
+                key: "unarchive",
+                description: this.env._t("Unarchive"),
+                callback: () => this.toggleArchiveState(false),
+            });
+        }
+        if (this.activeActions.delete && !isM2MGrouped) {
+            otherActionItems.push({
+                key: "delete",
+                description: this.env._t("Delete"),
+                callback: () => this.onDeleteSelectedRecords(),
+            });
+        }
+        return Object.assign({}, this.props.info.actionMenus, { other: otherActionItems });
+    }
+}
+```
+
+</details>
+
+在当前function中，可以看到关于`export`、`archive`、`delete`的相关逻辑，这分别对应着数据的导出、归档、删除。
+
+其余actionItems则来源于`this.props.info.actionMenus`。 list_view的`props`信息就要向上追溯到`View`组件，其props信息来源于`View`组件的`loadView()`.
+
+<details>
+    <summary>loadView()</summary>
+
+```javascript title="view.js"
+export class View extends Component {
+    // ...
+    async loadView(props) {
+        // determine view type
+        let descr = viewRegistry.get(props.type);
+        const type = descr.type;
+
+        // determine views for which descriptions should be obtained
+        let { viewId, searchViewId } = props;
+
+        const views = deepCopy(props.views || this.env.config.views);
+        const view = views.find((v) => v[1] === type) || [];
+        if (view.length) {
+            view[0] = viewId !== undefined ? viewId : view[0];
+            viewId = view[0];
+        } else {
+            view.push(viewId || false, type);
+            views.push(view); // viewId will remain undefined if not specified and loadView=false
+        }
+
+        const searchView = views.find((v) => v[1] === "search");
+        if (searchView) {
+            searchView[0] = searchViewId !== undefined ? searchViewId : searchView[0];
+            searchViewId = searchView[0];
+        } else if (searchViewId !== undefined) {
+            views.push([searchViewId, "search"]);
+        }
+        // searchViewId will remains undefined if loadSearchView=false
+
+        // prepare view description
+        const { context, resModel, loadActionMenus, loadIrFilters } = props;
+        let {
+            arch,
+            fields,
+            relatedModels,
+            searchViewArch,
+            searchViewFields,
+            irFilters,
+            actionMenus,
+        } = props;
+
+        const loadView = !arch || (!actionMenus && loadActionMenus);
+        const loadSearchView =
+            (searchViewId !== undefined && !searchViewArch) || (!irFilters && loadIrFilters);
+
+        let viewDescription = { viewId, resModel, type };
+        let searchViewDescription;
+        if (loadView || loadSearchView) {
+            // view description (or search view description if required) is incomplete
+            // a loadViews is done to complete the missing information
+            const result = await this.viewService.loadViews(
+                { context, resModel, views },
+                { actionId: this.env.config.actionId, loadActionMenus, loadIrFilters }
+            );
+            // Note: if props.views is different from views, the cached descriptions
+            // will certainly not be reused! (but for the standard flow this will work as
+            // before)
+            viewDescription = result.views[type];
+            searchViewDescription = result.views.search;
+            if (loadSearchView) {
+                searchViewId = searchViewId || searchViewDescription.id;
+                if (!searchViewArch) {
+                    searchViewArch = searchViewDescription.arch;
+                    searchViewFields = result.fields;
+                }
+                if (!irFilters) {
+                    irFilters = searchViewDescription.irFilters;
+                }
+            }
+            this.env.config.views = views;
+            fields = fields || markRaw(result.fields);
+            relatedModels = relatedModels || markRaw(result.relatedModels);
+        }
+
+        if (!arch) {
+            arch = viewDescription.arch;
+        }
+        if (!actionMenus) {
+            actionMenus = viewDescription.actionMenus;
+        }
+
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(arch, "text/xml");
+        const rootNode = xml.documentElement;
+
+        let subType = rootNode.getAttribute("js_class");
+        const bannerRoute = rootNode.getAttribute("banner_route");
+        const sample = rootNode.getAttribute("sample");
+
+        // determine ViewClass to instantiate (if not already done)
+        if (subType) {
+            if (viewRegistry.contains(subType)) {
+                descr = viewRegistry.get(subType);
+            } else {
+                subType = null;
+            }
+        }
+
+        Object.assign(this.env.config, {
+            viewArch: rootNode,
+            viewId: viewDescription.id,
+            viewType: type,
+            viewSubType: subType,
+            bannerRoute,
+            noBreadcrumbs: props.noBreadcrumbs,
+            ...extractLayoutComponents(descr),
+        });
+        const info = {
+            actionMenus,
+            mode: props.display.mode,
+            irFilters,
+            searchViewArch,
+            searchViewFields,
+            searchViewId,
+        };
+
+        // prepare the view props
+        const viewProps = {
+            info,
+            arch,
+            fields,
+            relatedModels,
+            resModel,
+            useSampleModel: false,
+            className: `${props.className} o_view_controller o_${this.env.config.viewType}_view`,
+        };
+        if (viewDescription.custom_view_id) {
+            // for dashboard
+            viewProps.info.customViewId = viewDescription.custom_view_id;
+        }
+        if (props.globalState) {
+            viewProps.globalState = props.globalState;
+        }
+
+        if ("useSampleModel" in props) {
+            viewProps.useSampleModel = props.useSampleModel;
+        } else if (sample) {
+            viewProps.useSampleModel = Boolean(evaluateExpr(sample));
+        }
+
+        for (const key in props) {
+            if (!STANDARD_PROPS.includes(key)) {
+                viewProps[key] = props[key];
+            }
+        }
+
+        const { noContentHelp } = props;
+        if (noContentHelp) {
+            viewProps.info.noContentHelp = noContentHelp;
+        }
+
+        const searchMenuTypes =
+            props.searchMenuTypes || descr.searchMenuTypes || this.constructor.searchMenuTypes;
+        viewProps.searchMenuTypes = searchMenuTypes;
+
+        const finalProps = descr.props ? descr.props(viewProps, descr, this.env.config) : viewProps;
+        // prepare the WithSearch component props
+        this.Controller = descr.Controller;
+        this.componentProps = finalProps;
+        this.withSearchProps = {
+            ...toRaw(props),
+            hideCustomGroupBy: props.hideCustomGroupBy || descr.hideCustomGroupBy,
+            searchMenuTypes,
+            SearchModel: descr.SearchModel,
+        };
+
+        if (searchViewId !== undefined) {
+            this.withSearchProps.searchViewId = searchViewId;
+        }
+        if (searchViewArch) {
+            this.withSearchProps.searchViewArch = searchViewArch;
+            this.withSearchProps.searchViewFields = searchViewFields;
+        }
+        if (irFilters) {
+            this.withSearchProps.irFilters = irFilters;
+        }
+
+        if (descr.display) {
+            // FIXME: there's something inelegant here: display might come from
+            // the View's defaultProps, in which case, modifying it in place
+            // would have unwanted effects.
+            const viewDisplay = deepCopy(descr.display);
+            const display = { ...this.withSearchProps.display };
+            for (const key in viewDisplay) {
+                if (typeof display[key] === "object") {
+                    Object.assign(display[key], viewDisplay[key]);
+                } else if (!(key in display) || display[key]) {
+                    display[key] = viewDisplay[key];
+                }
+            }
+            this.withSearchProps.display = display;
+        }
+
+        for (const key in this.withSearchProps) {
+            if (!(key in WithSearch.props)) {
+                delete this.withSearchProps[key];
+            }
+        }
+    }
+}
+```
+
+</details>
+
+props对应函数中的`this.componentProps`,我们详细查看代码就很容易发现actionMenus来源于`this.viewService.loadViews()`,下面是信息流向。
+
+```
+this.viewService.loadViews()
+    ↓
+viewDescription.actionMenus
+    ↓
+info.actionMenus
+    ↓
+viewProps.info
+    ↓
+this.componentProps
+```
+
+## viewService
+
+下面来查看`viewService.loadViews()`的实现。
+
+查看`loadView()`可以发现，actionMenus的信息又来源于`Model.get_views`.
+
+```
+viewDescription.actionMenus = toolbar;
+    ↑
+toolbar = views[viewType].toolbar;
+    ↑
+views = orm.call(resModel, "get_views", [], { context, views, options: loadViewsOptions })
+```
+
+<details>
+    <summary>viewService.loadViews()</summary>
+
+```javascript title="view_service.js"
+export const viewService = {
+    dependencies: ["orm"],
+    start(env, { orm }) {
+        // ...
+
+        async function loadViews(params, options = {}) {
+            const loadViewsOptions = {
+                action_id: options.actionId || false,
+                load_filters: options.loadIrFilters || false,
+                toolbar: options.loadActionMenus || false,
+            };
+            if (env.isSmall) {
+                loadViewsOptions.mobile = true;
+            }
+            const { context, resModel, views } = params;
+            const filteredContext = Object.fromEntries(
+                Object.entries(context || {}).filter((k, v) => !String(k).startsWith("default_"))
+            );
+            const key = JSON.stringify([resModel, views, filteredContext, loadViewsOptions]);
+            if (!cache[key]) {
+                cache[key] = orm
+                    .call(resModel, "get_views", [], { context, views, options: loadViewsOptions })
+                    .then((result) => {
+                        const { models, views } = result;
+                        const modelsCopy = deepCopy(models); // for legacy views
+                        const viewDescriptions = {
+                            __legacy__: generateLegacyLoadViewsResult(resModel, views, modelsCopy),
+                            fields: models[resModel],
+                            relatedModels: models,
+                            views: {},
+                        };
+                        for (const [resModel, fields] of Object.entries(modelsCopy)) {
+                            const key = JSON.stringify(["fields", resModel, undefined, undefined]);
+                            cache[key] = Promise.resolve(fields);
+                        }
+                        for (const viewType in views) {
+                            const { arch, toolbar, id, filters, custom_view_id } = views[viewType];
+                            const viewDescription = { arch, id, custom_view_id };
+                            if (toolbar) {
+                                viewDescription.actionMenus = toolbar;
+                            }
+                            if (filters) {
+                                viewDescription.irFilters = filters;
+                            }
+                            viewDescriptions.views[viewType] = viewDescription;
+                        }
+                        return viewDescriptions;
+                    })
+                    .catch((error) => {
+                        delete cache[key];
+                        return Promise.reject(error);
+                    });
+            }
+            return cache[key];
+        }
+        return { loadViews, loadFields };
+    },
+};
+
+```
+
+</details>
+
+## base Model
+
+以下是toolbar的数据流向，可以找到最终来源为`self.env['ir.actions.actions'].get_bindings(self._name)`。
+
+```
+result['views'][view_type]['toolbar'].setdefault(key, []).append(action)
+    ↑
+action = bindings.get(action_type, [])
+    ↑
+for action_type, key in (('report', 'print'), ('action', 'action'))
+    ↑
+bindings = self.env['ir.actions.actions'].get_bindings(self._name)
+```
+
+<details>
+    <summary>get_views()</summary>
+
+```python title="ir_ui_view.py"
+class Model(models.AbstractModel):
+    _inherit = 'base'
+
+    # ...
+
+    @api.model
+    def get_views(self, views, options=None):
+        """ Returns the fields_views of given views, along with the fields of
+        the current model, and optionally its filters for the given action.
+
+        :param views: list of [view_id, view_type]
+        :param dict options: a dict optional boolean flags, set to enable:
+
+            ``toolbar``
+                includes contextual actions when loading fields_views
+            ``load_filters``
+                returns the model's filters
+            ``action_id``
+                id of the action to get the filters, otherwise loads the global
+                filters or the model
+
+        :return: dictionary with fields_views, fields and optionally filters
+        """
+        options = options or {}
+        result = {}
+
+        result['views'] = {
+            v_type: self.get_view(
+                v_id, v_type if v_type != 'list' else 'tree',
+                **options
+            )
+            for [v_id, v_type] in views
+        }
+
+        models = {}
+        for view in result['views'].values():
+            for model, model_fields in view.pop('models').items():
+                models.setdefault(model, set()).update(model_fields)
+
+        result['models'] = {}
+
+        for model, model_fields in models.items():
+            result['models'][model] = self.env[model].fields_get(
+                allfields=model_fields, attributes=self._get_view_field_attributes()
+            )
+
+        # Add related action information if asked
+        if options.get('toolbar'):
+            for view in result['views'].values():
+                view['toolbar'] = {}
+
+            bindings = self.env['ir.actions.actions'].get_bindings(self._name)
+            for action_type, key in (('report', 'print'), ('action', 'action')):
+                for action in bindings.get(action_type, []):
+                    view_types = (
+                        action['binding_view_types'].split(',')
+                        if action.get('binding_view_types')
+                        else result['views'].keys()
+                    )
+                    for view_type in view_types:
+                        view_type = view_type if view_type != 'tree' else 'list'
+                        if view_type in result['views']:
+                            result['views'][view_type]['toolbar'].setdefault(key, []).append(action)
+
+        if options.get('load_filters') and 'search' in result['views']:
+            result['views']['search']['filters'] = self.env['ir.filters'].get_filters(
+                self._name, options.get('action_id')
+            )
+
+        return result
+
+```
+
+</details>
+
+
+## 完整代码
+
+<Tabs>
+  <TabItem value="list_controller_xml" label="list_controller.xml">
+
+```xml title="list_controller.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="web.ListView" owl="1">
+        <div t-att-class="className" t-ref="root">
+            <Layout className="model.useSampleModel ? 'o_view_sample_data' : ''" display="display">
+                <t t-set-slot="layout-buttons">
+                    <t t-if="env.isSmall and nbSelected">
+                        <t t-call="web.ListView.Selection" />
+                    </t>
+                    <t t-else="">
+                        <div class="o_cp_buttons" role="toolbar" aria-label="Control panel buttons" t-ref="buttons">
+                            <t t-call="{{ props.buttonTemplate }}"/>
+                        </div>
+                    </t>
+                </t>
+                <t t-set-slot="control-panel-bottom-left">
+                    <t t-if="props.info.actionMenus and model.root.selection.length">
+                        <ActionMenus
+                            getActiveIds="() => model.root.selection.map((r) => r.resId)"
+                            context="props.context"
+                            domain="props.domain"
+                            items="getActionMenuItems()"
+                            isDomainSelected="model.root.isDomainSelected"
+                            resModel="model.root.resModel"
+                            onActionExecuted="() => model.load()"/>
+                    </t>
+                </t>
+                <t t-component="props.Renderer" list="model.root" activeActions="activeActions" archInfo="archInfo" allowSelectors="props.allowSelectors" editable="editable" openRecord.bind="openRecord" noContentHelp="props.info.noContentHelp" onAdd.bind="createRecord" onOptionalFieldsChanged.bind="onOptionalFieldsChanged"/>
+            </Layout>
+        </div>
+    </t>
+
+    <t t-name="web.ListView.Buttons" owl="1">
+        <div class="o_list_buttons d-flex" role="toolbar" aria-label="Main actions">
+            <t t-if="props.showButtons">
+                <t t-if="model.root.editedRecord">
+                    <button type="button" class="btn btn-primary o_list_button_save" data-hotkey="s" t-on-click.stop="onClickSave">
+                        Save
+                    </button>
+                    <button type="button" class="btn btn-secondary o_list_button_discard" data-hotkey="j" t-on-click="onClickDiscard" t-on-mousedown="onMouseDownDiscard">
+                        Discard
+                    </button>
+                </t>
+                <t t-elif="activeActions.create">
+                    <button type="button" class="btn btn-primary o_list_button_add" data-hotkey="c" t-on-click="onClickCreate" data-bounce-button="">
+                        New
+                    </button>
+                </t>
+                <t t-if="nbTotal and !nbSelected and activeActions.exportXlsx and isExportEnable and !env.isSmall">
+                    <button type="button" class="btn btn-secondary fa fa-download o_list_export_xlsx" data-tooltip="Export All" aria-label="Export All" t-on-click="onDirectExportData"/>
+                </t>
+            </t>
+            <t t-if="nbSelected">
+                <t t-foreach="archInfo.headerButtons" t-as="button" t-key="button.id">
+                    <ListViewHeaderButton
+                        list="model.root"
+                        clickParams="button.clickParams"
+                        defaultRank="button.defaultRank"
+                        domain="props.domain"
+                        icon="button.icon"
+                        string="button.string"
+                        title="button.title"
+                    />
+                </t>
+                <t t-if="!env.isSmall">
+                    <t t-call="web.ListView.Selection"/>
+                </t>
+            </t>
+        </div>
+    </t>
+
+    <t t-name="web.ListView.Selection" owl="1">
+        <div class="o_list_selection_box alert alert-info d-inline-flex align-items-center ps-0 px-lg-2 py-0 mb-0 ms-0 ms-md-2" role="alert">
+            <t t-if="env.isSmall">
+                <button class="btn btn-link py-0 o_discard_selection" t-on-click="discardSelection">
+                    <span class="fa-2x">&#215;</span>
+                </button>
+            </t>
+            <span t-if="isDomainSelected">All <span class="font-monospace" t-esc="nbTotal"/> selected</span>
+            <t t-else="">
+                <span class="font-monospace me-1" t-esc="nbSelected"/> selected
+                <a t-if="isPageSelected and nbTotal > nbSelected" href="#" class="o_list_select_domain ms-2 btn btn-sm btn-info px-2 py-1 border-0 fw-normal" t-on-click="onSelectDomain">
+                    <i class="fa fa-arrow-right"/> Select all <span class="font-monospace" t-esc="nbTotal"/>
+                </a>
+            </t>
+        </div>
+    </t>
+
+</templates>
+
+```
+
+  </TabItem>
+  <TabItem value="list_controller_js" label="list_controller.js">
+
+```javascript title="list_controller.js"
+/** @odoo-module */
+
+import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import { download } from "@web/core/network/download";
+import { evaluateExpr } from "@web/core/py_js/py";
+import { DynamicRecordList } from "@web/views/relational_model";
+import { unique } from "@web/core/utils/arrays";
+import { useService } from "@web/core/utils/hooks";
+import { sprintf } from "@web/core/utils/strings";
+import { ActionMenus } from "@web/search/action_menus/action_menus";
+import { Layout } from "@web/search/layout";
+import { usePager } from "@web/search/pager_hook";
+import { session } from "@web/session";
+import { useModel } from "@web/views/model";
+import { standardViewProps } from "@web/views/standard_view_props";
+import { useSetupView } from "@web/views/view_hook";
+import { ViewButton } from "@web/views/view_button/view_button";
+import { useViewButtons } from "@web/views/view_button/view_button_hook";
+import { ExportDataDialog } from "@web/views/view_dialogs/export_data_dialog";
+
+import { Component, onWillStart, useSubEnv, useEffect, useRef } from "@odoo/owl";
+
+export class ListViewHeaderButton extends ViewButton {
+    async onClick() {
+        const { clickParams, list } = this.props;
+        const resIds = await list.getResIds(true);
+        clickParams.buttonContext = {
+            active_domain: this.props.domain,
+            // active_id: resIds[0], // FGE TODO
+            active_ids: resIds,
+            active_model: list.resModel,
+        };
+
+        this.env.onClickViewButton({
+            clickParams,
+            getResParams: () => ({
+                context: list.context,
+                evalContext: list.evalContext,
+                resModel: list.resModel,
+                resIds,
+            }),
+        });
+    }
+}
+ListViewHeaderButton.props = [...ViewButton.props, "list", "domain"];
+
+// -----------------------------------------------------------------------------
+
+export class ListController extends Component {
+    setup() {
+        this.actionService = useService("action");
+        this.dialogService = useService("dialog");
+        this.notificationService = useService("notification");
+        this.userService = useService("user");
+        this.rpc = useService("rpc");
+        this.rootRef = useRef("root");
+
+        this.archInfo = this.props.archInfo;
+        this.editable = this.props.editable ? this.archInfo.editable : false;
+        this.multiEdit = this.archInfo.multiEdit;
+        this.activeActions = this.archInfo.activeActions;
+        const fields = this.props.fields;
+        const { rootState } = this.props.state || {};
+        const { rawExpand } = this.archInfo;
+        this.model = useModel(this.props.Model, {
+            resModel: this.props.resModel,
+            fields,
+            activeFields: this.archInfo.activeFields,
+            fieldNodes: this.archInfo.fieldNodes,
+            handleField: this.archInfo.handleField,
+            viewMode: "list",
+            groupByInfo: this.archInfo.groupBy.fields,
+            limit: this.archInfo.limit || this.props.limit,
+            countLimit: this.archInfo.countLimit,
+            defaultOrder: this.archInfo.defaultOrder,
+            expand: rawExpand ? evaluateExpr(rawExpand, this.props.context) : false,
+            groupsLimit: this.archInfo.groupsLimit,
+            multiEdit: this.multiEdit,
+            rootState,
+        });
+
+        this.optionalActiveFields = [];
+
+        onWillStart(async () => {
+            this.isExportEnable = await this.userService.hasGroup("base.group_allow_export");
+        });
+
+        this.archiveEnabled =
+            "active" in fields
+                ? !fields.active.readonly
+                : "x_active" in fields
+                ? !fields.x_active.readonly
+                : false;
+        useSubEnv({ model: this.model}); // do this in useModel?
+        useViewButtons(this.model, this.rootRef, {
+            beforeExecuteAction: this.beforeExecuteActionButton.bind(this),
+            afterExecuteAction: this.afterExecuteActionButton.bind(this),
+        });
+        useSetupView({
+            rootRef: this.rootRef,
+            beforeLeave: async () => {
+                const list = this.model.root;
+                const editedRecord = list.editedRecord;
+                console.log('List Controller beforeLeave');
+                if (editedRecord) {
+                    if (!(await list.unselectRecord(true))) {
+                        return false;
+                    }
+                }
+            },
+            beforeUnload: async (ev) => {
+                const editedRecord = this.model.root.editedRecord;
+                if (editedRecord) {
+                    const isValid = await editedRecord.urgentSave();
+                    if (!isValid) {
+                        ev.preventDefault();
+                        ev.returnValue = "Unsaved changes";
+                    }
+                }
+            },
+            getLocalState: () => {
+                return {
+                    rootState: this.model.root.exportState(),
+                };
+            },
+            getOrderBy: () => {
+                return this.model.root.orderBy;
+            },
+        });
+
+        usePager(() => {
+            const list = this.model.root;
+            const { count, hasLimitedCount, isGrouped, limit, offset } = list;
+            return {
+                offset: offset,
+                limit: limit,
+                total: count,
+                onUpdate: async ({ offset, limit }, hasNavigated) => {
+                    if (this.model.root.editedRecord) {
+                        if (!(await this.model.root.editedRecord.save())) {
+                            return;
+                        }
+                    }
+                    await list.load({ limit, offset });
+                    this.render(true); // FIXME WOWL reactivity
+                    if (hasNavigated) {
+                        this.onPageChangeScroll();
+                    }
+                },
+                updateTotal: !isGrouped && hasLimitedCount ? () => list.fetchCount() : undefined,
+            };
+        });
+
+        useEffect(
+            () => {
+                if (this.props.onSelectionChanged) {
+                    const resIds = this.model.root.selection.map((record) => record.resId);
+                    this.props.onSelectionChanged(resIds);
+                }
+            },
+            () => [this.model.root.selection.length]
+        );
+    }
+
+    async createRecord({ group } = {}) {
+        const list = (group && group.list) || this.model.root;
+        if (this.editable && !list.isGrouped) {
+            if (!(list instanceof DynamicRecordList)) {
+                throw new Error("List should be a DynamicRecordList");
+            }
+            if (list.editedRecord) {
+                await list.editedRecord.save();
+            }
+            if (!list.editedRecord) {
+                await (group || list).createRecord({}, this.editable === "top");
+            }
+            this.render();
+        } else {
+            await this.props.createRecord();
+        }
+    }
+
+    async openRecord(record) {
+        if (this.archInfo.openAction) {
+            this.actionService.doActionButton({
+                name: this.archInfo.openAction.action,
+                type: this.archInfo.openAction.type,
+                resModel: record.resModel,
+                resId: record.resId,
+                resIds: record.resIds,
+                context: record.context,
+                onClose: async () => {
+                    await record.model.root.load();
+                    record.model.notify();
+                },
+            });
+        } else {
+            const activeIds = this.model.root.records.map((datapoint) => datapoint.resId);
+            this.props.selectRecord(record.resId, { activeIds });
+        }
+    }
+
+    onClickCreate() {
+        this.createRecord();
+    }
+
+    onClickDiscard() {
+        const editedRecord = this.model.root.editedRecord;
+        if (editedRecord.isVirtual) {
+            this.model.root.removeRecord(editedRecord);
+        } else {
+            editedRecord.discard();
+        }
+    }
+
+    onClickSave() {
+        this.model.root.editedRecord.save();
+    }
+
+    onMouseDownDiscard(mouseDownEvent) {
+        const list = this.model.root;
+        list.blockUpdate = true;
+        document.addEventListener(
+            "mouseup",
+            (mouseUpEvent) => {
+                if (mouseUpEvent.target !== mouseDownEvent.target) {
+                    list.blockUpdate = false;
+                    list.multiSave(list.editedRecord);
+                }
+            },
+            { capture: true, once: true }
+        );
+    }
+
+    onPageChangeScroll() {
+        if (this.rootRef && this.rootRef.el) {
+            this.rootRef.el.querySelector(".o_content").scrollTop = 0;
+        }
+    }
+
+    getSelectedResIds() {
+        return this.model.root.getResIds(true);
+    }
+
+    getActionMenuItems() {
+        const isM2MGrouped = this.model.root.isM2MGrouped;
+        const otherActionItems = [];
+        if (this.isExportEnable) {
+            otherActionItems.push({
+                key: "export",
+                description: this.env._t("Export"),
+                callback: () => this.onExportData(),
+            });
+        }
+        if (this.archiveEnabled && !isM2MGrouped) {
+            otherActionItems.push({
+                key: "archive",
+                description: this.env._t("Archive"),
+                callback: () => {
+                    const dialogProps = {
+                        body: this.env._t(
+                            "Are you sure that you want to archive all the selected records?"
+                        ),
+                        confirmLabel: this.env._t("Archive"),
+                        confirm: () => {
+                            this.toggleArchiveState(true);
+                        },
+                        cancel: () => {},
+                    };
+                    this.dialogService.add(ConfirmationDialog, dialogProps);
+                },
+            });
+            otherActionItems.push({
+                key: "unarchive",
+                description: this.env._t("Unarchive"),
+                callback: () => this.toggleArchiveState(false),
+            });
+        }
+        if (this.activeActions.delete && !isM2MGrouped) {
+            otherActionItems.push({
+                key: "delete",
+                description: this.env._t("Delete"),
+                callback: () => this.onDeleteSelectedRecords(),
+            });
+        }
+        return Object.assign({}, this.props.info.actionMenus, { other: otherActionItems });
+    }
+
+    async onSelectDomain() {
+        this.model.root.selectDomain(true);
+        if (this.props.onSelectionChanged) {
+            const resIds = await this.model.root.getResIds(true);
+            this.props.onSelectionChanged(resIds);
+        }
+    }
+
+    get className() {
+        return this.props.className;
+    }
+
+    get nbSelected() {
+        return this.model.root.selection.length;
+    }
+
+    get isPageSelected() {
+        const root = this.model.root;
+        return root.selection.length === root.records.length;
+    }
+
+    get isDomainSelected() {
+        return this.model.root.isDomainSelected;
+    }
+
+    get nbTotal() {
+        const list = this.model.root;
+        return list.isGrouped ? list.nbTotalRecords : list.count;
+    }
+
+    onOptionalFieldsChanged(optionalActiveFields) {
+        this.optionalActiveFields = optionalActiveFields;
+    }
+
+    get defaultExportList() {
+        return unique(
+            this.props.archInfo.columns
+                .filter((col) => col.type === "field")
+                .filter((col) => !col.optional || this.optionalActiveFields[col.name])
+                .map((col) => this.props.fields[col.name])
+                .filter((field) => field.exportable !== false)
+        );
+    }
+
+    get display() {
+        if (!this.env.isSmall) {
+            return this.props.display;
+        }
+        const { controlPanel } = this.props.display;
+        return {
+            ...this.props.display,
+            controlPanel: {
+                ...controlPanel,
+                "bottom-right": !this.nbSelected,
+            },
+        };
+    }
+
+    async downloadExport(fields, import_compat, format) {
+        let ids = false;
+        if (!this.isDomainSelected) {
+            const resIds = await this.getSelectedResIds();
+            ids = resIds.length > 0 && resIds;
+        }
+        const exportedFields = fields.map((field) => ({
+            name: field.name || field.id,
+            label: field.label || field.string,
+            store: field.store,
+            type: field.field_type || field.type,
+        }));
+        if (import_compat) {
+            exportedFields.unshift({ name: "id", label: this.env._t("External ID") });
+        }
+        await download({
+            data: {
+                data: JSON.stringify({
+                    import_compat,
+                    context: this.props.context,
+                    domain: this.model.root.domain,
+                    fields: exportedFields,
+                    groupby: this.model.root.groupBy,
+                    ids,
+                    model: this.model.root.resModel,
+                }),
+            },
+            url: `/web/export/${format}`,
+        });
+    }
+
+    async getExportedFields(model, import_compat, parentParams) {
+        return await this.rpc("/web/export/get_fields", {
+            ...parentParams,
+            model,
+            import_compat,
+        });
+    }
+
+    /**
+     * Opens the Export Dialog
+     *
+     * @private
+     */
+    async onExportData() {
+        const dialogProps = {
+            context: this.props.context,
+            defaultExportList: this.defaultExportList,
+            download: this.downloadExport.bind(this),
+            getExportedFields: this.getExportedFields.bind(this),
+            root: this.model.root,
+        };
+        this.dialogService.add(ExportDataDialog, dialogProps);
+    }
+    /**
+     * Export Records in a xls file
+     *
+     * @private
+     */
+    async onDirectExportData() {
+        await this.downloadExport(this.defaultExportList, false, "xlsx");
+    }
+    /**
+     * Called when clicking on 'Archive' or 'Unarchive' in the sidebar.
+     *
+     * @private
+     * @param {boolean} archive
+     * @returns {Promise}
+     */
+    async toggleArchiveState(archive) {
+        let resIds;
+        const isDomainSelected = this.model.root.isDomainSelected;
+        const total = this.model.root.count;
+        if (archive) {
+            resIds = await this.model.root.archive(true);
+        } else {
+            resIds = await this.model.root.unarchive(true);
+        }
+        if (
+            isDomainSelected &&
+            resIds.length === session.active_ids_limit &&
+            resIds.length < total
+        ) {
+            this.notificationService.add(
+                sprintf(
+                    this.env._t(
+                        "Of the %d records selected, only the first %d have been archived/unarchived."
+                    ),
+                    resIds.length,
+                    total
+                ),
+                { title: this.env._t("Warning") }
+            );
+        }
+    }
+
+    get deleteConfirmationDialogProps() {
+        const root = this.model.root;
+        const body =
+            root.isDomainSelected || root.selection.length > 1
+                ? this.env._t("Are you sure you want to delete these records?")
+                : this.env._t("Are you sure you want to delete this record?");
+        return {
+            body,
+            confirm: async () => {
+                const total = root.count;
+                const resIds = await this.model.root.deleteRecords();
+                this.model.notify();
+                if (
+                    root.isDomainSelected &&
+                    resIds.length === session.active_ids_limit &&
+                    resIds.length < total
+                ) {
+                    this.notificationService.add(
+                        sprintf(
+                            this.env._t(
+                                `Only the first %s records have been deleted (out of %s selected)`
+                            ),
+                            resIds.length,
+                            total
+                        ),
+                        { title: this.env._t("Warning") }
+                    );
+                }
+            },
+            cancel: () => {},
+        };
+    }
+
+    async onDeleteSelectedRecords() {
+        this.dialogService.add(ConfirmationDialog, this.deleteConfirmationDialogProps);
+    }
+
+    discardSelection() {
+        this.model.root.records.forEach((record) => {
+            record.toggleSelection(false);
+        });
+    }
+
+    async beforeExecuteActionButton(clickParams) {
+        if (clickParams.special !== "cancel" && this.model.root.editedRecord) {
+            return this.model.root.editedRecord.save();
+        }
+    }
+
+    async afterExecuteActionButton(clickParams) {}
+}
+
+ListController.template = `web.ListView`;
+ListController.components = { ActionMenus, ListViewHeaderButton, Layout, ViewButton };
+ListController.props = {
+    ...standardViewProps,
+    allowSelectors: { type: Boolean, optional: true },
+    editable: { type: Boolean, optional: true },
+    onSelectionChanged: { type: Function, optional: true },
+    showButtons: { type: Boolean, optional: true },
+    Model: Function,
+    Renderer: Function,
+    buttonTemplate: String,
+    archInfo: Object,
+};
+ListController.defaultProps = {
+    allowSelectors: true,
+    createRecord: () => {},
+    editable: true,
+    selectRecord: () => {},
+    showButtons: true,
+};
+
+```
+
+  </TabItem>
+  <TabItem value="view_js" label="view.js">
+
+```javascript title="view.js"
+/** @odoo-module **/
+
+import { evaluateExpr } from "@web/core/py_js/py";
+import { registry } from "@web/core/registry";
+import { KeepLast } from "@web/core/utils/concurrency";
+import { useService } from "@web/core/utils/hooks";
+import { deepCopy, pick } from "@web/core/utils/objects";
+import { ControlPanel } from "@web/search/control_panel/control_panel";
+import { extractLayoutComponents } from "@web/search/layout";
+import { SearchPanel } from "@web/search/search_panel/search_panel";
+import { WithSearch } from "@web/search/with_search/with_search";
+import { OnboardingBanner } from "@web/views/onboarding_banner";
+import { useActionLinks } from "@web/views/view_hook";
+
+import {
+    Component,
+    markRaw,
+    onWillUpdateProps,
+    onWillStart,
+    toRaw,
+    useSubEnv,
+    reactive,
+} from "@odoo/owl";
+const viewRegistry = registry.category("views");
+
+/** @typedef {Object} Config
+ *  @property {integer|false} actionId
+ *  @property {string|false} actionType
+ *  @property {Object} actionFlags
+ *  @property {() => []} breadcrumbs
+ *  @property {() => string} getDisplayName
+ *  @property {(string) => void} setDisplayName
+ *  @property {() => Object} getPagerProps
+ *  @property {Object[]} viewSwitcherEntry
+ *  @property {Object[]} viewSwitcherEntry
+ *  @property {Component} ControlPanel
+ *  @property {Component} SearchPanel
+ *  @property {Component} Banner
+ */
+
+/**
+ * Returns the default config to use if no config, or an incomplete config has
+ * been provided in the env, which can happen with standalone views.
+ * @returns {Config}
+ */
+export function getDefaultConfig() {
+    let displayName;
+    const config = {
+        actionId: false,
+        actionType: false,
+        actionFlags: {},
+        breadcrumbs: reactive([
+            {
+                get name() {
+                    return displayName;
+                },
+            },
+        ]),
+        disableSearchBarAutofocus: false,
+        getDisplayName: () => displayName,
+        historyBack: () => {},
+        pagerProps: {},
+        setDisplayName: (newDisplayName) => {
+            displayName = newDisplayName;
+            // This is a hack to force the reactivity when a new displayName is set
+            config.breadcrumbs.push(undefined);
+            config.breadcrumbs.pop();
+        },
+        viewSwitcherEntries: [],
+        views: [],
+        ControlPanel: ControlPanel,
+        SearchPanel: SearchPanel,
+        Banner: OnboardingBanner,
+    };
+    return config;
+}
+
+/** @typedef {import("./relational_model").OrderTerm} OrderTerm */
+
+/** @typedef {Object} ViewProps
+ *  @property {string} resModel
+ *  @property {string} type
+ *
+ *  @property {string} [arch] if given, fields must be given too /\ no post processing is done (evaluation of "groups" attribute,...)
+ *  @property {Object} [fields] if given, arch must be given too
+ *  @property {number|false} [viewId]
+ *  @property {Object} [actionMenus]
+ *  @property {boolean} [loadActionMenus=false]
+ *
+ *  @property {string} [searchViewArch] if given, searchViewFields must be given too
+ *  @property {Object} [searchViewFields] if given, searchViewArch must be given too
+ *  @property {number|false} [searchViewId]
+ *  @property {Object[]} [irFilters]
+ *  @property {boolean} [loadIrFilters=false]
+ *
+ *  @property {Object} [comparison]
+ *  @property {Object} [context={}]
+ *  @property {DomainRepr} [domain]
+ *  @property {string[]} [groupBy]
+ *  @property {OrderTerm[]} [orderBy]
+ *
+ *  @property {boolean} [useSampleModel]
+ *  @property {string} [noContentHelp]
+ *
+ *  @property {Object} [display={}] to rework
+ *
+ *  manipulated by withSearch
+ *
+ *  @property {boolean} [activateFavorite]
+ *  @property {Object[]} [dynamicFilters]
+ *  @property {boolean} [hideCustomGroupBy]
+ *  @property {string[]} [searchMenuTypes]
+ *  @property {Object} [globalState]
+ */
+
+export class ViewNotFoundError extends Error {}
+
+const STANDARD_PROPS = [
+    "resModel",
+    "type",
+
+    "arch",
+    "fields",
+    "relatedModels",
+    "viewId",
+    "views",
+    "actionMenus",
+    "loadActionMenus",
+
+    "searchViewArch",
+    "searchViewFields",
+    "searchViewId",
+    "irFilters",
+    "loadIrFilters",
+
+    "comparison",
+    "context",
+    "domain",
+    "groupBy",
+    "orderBy",
+
+    "useSampleModel",
+    "noContentHelp",
+    "className",
+
+    "display",
+    "globalState",
+
+    "activateFavorite",
+    "dynamicFilters",
+    "hideCustomGroupBy",
+    "searchMenuTypes",
+
+    // LEGACY: remove this later (clean when mappings old state <-> new state are established)
+    "searchPanel",
+    "searchModel",
+];
+
+export class View extends Component {
+    setup() {
+        const { arch, fields, resModel, searchViewArch, searchViewFields, type } = this.props;
+        if (!resModel) {
+            throw Error(`View props should have a "resModel" key`);
+        }
+        if (!type) {
+            throw Error(`View props should have a "type" key`);
+        }
+        if ((arch && !fields) || (!arch && fields)) {
+            throw new Error(`"arch" and "fields" props must be given together`);
+        }
+        if ((searchViewArch && !searchViewFields) || (!searchViewArch && searchViewFields)) {
+            throw new Error(`"searchViewArch" and "searchViewFields" props must be given together`);
+        }
+
+        this.viewService = useService("view");
+        this.withSearchProps = null;
+
+        useSubEnv({
+            keepLast: new KeepLast(),
+            config: {
+                ...getDefaultConfig(),
+                ...this.env.config,
+            },
+        });
+
+        this.handleActionLinks = useActionLinks({ resModel });
+
+        onWillStart(() => this.loadView(this.props));
+        onWillUpdateProps((nextProps) => this.onWillUpdateProps(nextProps));
+    }
+
+    async loadView(props) {
+        // determine view type
+        let descr = viewRegistry.get(props.type);
+        const type = descr.type;
+
+        // determine views for which descriptions should be obtained
+        let { viewId, searchViewId } = props;
+
+        const views = deepCopy(props.views || this.env.config.views);
+        const view = views.find((v) => v[1] === type) || [];
+        if (view.length) {
+            view[0] = viewId !== undefined ? viewId : view[0];
+            viewId = view[0];
+        } else {
+            view.push(viewId || false, type);
+            views.push(view); // viewId will remain undefined if not specified and loadView=false
+        }
+
+        const searchView = views.find((v) => v[1] === "search");
+        if (searchView) {
+            searchView[0] = searchViewId !== undefined ? searchViewId : searchView[0];
+            searchViewId = searchView[0];
+        } else if (searchViewId !== undefined) {
+            views.push([searchViewId, "search"]);
+        }
+        // searchViewId will remains undefined if loadSearchView=false
+
+        // prepare view description
+        const { context, resModel, loadActionMenus, loadIrFilters } = props;
+        let {
+            arch,
+            fields,
+            relatedModels,
+            searchViewArch,
+            searchViewFields,
+            irFilters,
+            actionMenus,
+        } = props;
+
+        const loadView = !arch || (!actionMenus && loadActionMenus);
+        const loadSearchView =
+            (searchViewId !== undefined && !searchViewArch) || (!irFilters && loadIrFilters);
+
+        let viewDescription = { viewId, resModel, type };
+        let searchViewDescription;
+        if (loadView || loadSearchView) {
+            // view description (or search view description if required) is incomplete
+            // a loadViews is done to complete the missing information
+            const result = await this.viewService.loadViews(
+                { context, resModel, views },
+                { actionId: this.env.config.actionId, loadActionMenus, loadIrFilters }
+            );
+            // Note: if props.views is different from views, the cached descriptions
+            // will certainly not be reused! (but for the standard flow this will work as
+            // before)
+            viewDescription = result.views[type];
+            searchViewDescription = result.views.search;
+            if (loadSearchView) {
+                searchViewId = searchViewId || searchViewDescription.id;
+                if (!searchViewArch) {
+                    searchViewArch = searchViewDescription.arch;
+                    searchViewFields = result.fields;
+                }
+                if (!irFilters) {
+                    irFilters = searchViewDescription.irFilters;
+                }
+            }
+            this.env.config.views = views;
+            fields = fields || markRaw(result.fields);
+            relatedModels = relatedModels || markRaw(result.relatedModels);
+        }
+
+        if (!arch) {
+            arch = viewDescription.arch;
+        }
+        if (!actionMenus) {
+            actionMenus = viewDescription.actionMenus;
+        }
+
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(arch, "text/xml");
+        const rootNode = xml.documentElement;
+
+        let subType = rootNode.getAttribute("js_class");
+        const bannerRoute = rootNode.getAttribute("banner_route");
+        const sample = rootNode.getAttribute("sample");
+
+        // determine ViewClass to instantiate (if not already done)
+        if (subType) {
+            if (viewRegistry.contains(subType)) {
+                descr = viewRegistry.get(subType);
+            } else {
+                subType = null;
+            }
+        }
+
+        Object.assign(this.env.config, {
+            viewArch: rootNode,
+            viewId: viewDescription.id,
+            viewType: type,
+            viewSubType: subType,
+            bannerRoute,
+            noBreadcrumbs: props.noBreadcrumbs,
+            ...extractLayoutComponents(descr),
+        });
+        const info = {
+            actionMenus,
+            mode: props.display.mode,
+            irFilters,
+            searchViewArch,
+            searchViewFields,
+            searchViewId,
+        };
+
+        // prepare the view props
+        const viewProps = {
+            info,
+            arch,
+            fields,
+            relatedModels,
+            resModel,
+            useSampleModel: false,
+            className: `${props.className} o_view_controller o_${this.env.config.viewType}_view`,
+        };
+        if (viewDescription.custom_view_id) {
+            // for dashboard
+            viewProps.info.customViewId = viewDescription.custom_view_id;
+        }
+        if (props.globalState) {
+            viewProps.globalState = props.globalState;
+        }
+
+        if ("useSampleModel" in props) {
+            viewProps.useSampleModel = props.useSampleModel;
+        } else if (sample) {
+            viewProps.useSampleModel = Boolean(evaluateExpr(sample));
+        }
+
+        for (const key in props) {
+            if (!STANDARD_PROPS.includes(key)) {
+                viewProps[key] = props[key];
+            }
+        }
+
+        const { noContentHelp } = props;
+        if (noContentHelp) {
+            viewProps.info.noContentHelp = noContentHelp;
+        }
+
+        const searchMenuTypes =
+            props.searchMenuTypes || descr.searchMenuTypes || this.constructor.searchMenuTypes;
+        viewProps.searchMenuTypes = searchMenuTypes;
+
+        const finalProps = descr.props ? descr.props(viewProps, descr, this.env.config) : viewProps;
+        // prepare the WithSearch component props
+        this.Controller = descr.Controller;
+        this.componentProps = finalProps;
+        this.withSearchProps = {
+            ...toRaw(props),
+            hideCustomGroupBy: props.hideCustomGroupBy || descr.hideCustomGroupBy,
+            searchMenuTypes,
+            SearchModel: descr.SearchModel,
+        };
+
+        if (searchViewId !== undefined) {
+            this.withSearchProps.searchViewId = searchViewId;
+        }
+        if (searchViewArch) {
+            this.withSearchProps.searchViewArch = searchViewArch;
+            this.withSearchProps.searchViewFields = searchViewFields;
+        }
+        if (irFilters) {
+            this.withSearchProps.irFilters = irFilters;
+        }
+
+        if (descr.display) {
+            // FIXME: there's something inelegant here: display might come from
+            // the View's defaultProps, in which case, modifying it in place
+            // would have unwanted effects.
+            const viewDisplay = deepCopy(descr.display);
+            const display = { ...this.withSearchProps.display };
+            for (const key in viewDisplay) {
+                if (typeof display[key] === "object") {
+                    Object.assign(display[key], viewDisplay[key]);
+                } else if (!(key in display) || display[key]) {
+                    display[key] = viewDisplay[key];
+                }
+            }
+            this.withSearchProps.display = display;
+        }
+
+        for (const key in this.withSearchProps) {
+            if (!(key in WithSearch.props)) {
+                delete this.withSearchProps[key];
+            }
+        }
+    }
+
+    onWillUpdateProps(nextProps) {
+        const oldProps = pick(this.props, "arch", "type", "resModel");
+        const newProps = pick(nextProps, "arch", "type", "resModel");
+        if (JSON.stringify(oldProps) !== JSON.stringify(newProps)) {
+            return this.loadView(nextProps);
+        }
+        // we assume that nextProps can only vary in the search keys:
+        // comparison, context, domain, groupBy, orderBy
+        const { comparison, context, domain, groupBy, orderBy } = nextProps;
+        Object.assign(this.withSearchProps, { comparison, context, domain, groupBy, orderBy });
+    }
+}
+
+View._download = async function () {};
+
+View.template = "web.View";
+View.components = { WithSearch };
+View.defaultProps = {
+    display: {},
+    context: {},
+    loadActionMenus: false,
+    loadIrFilters: false,
+    className: "",
+};
+
+View.searchMenuTypes = ["filter", "groupBy", "favorite"];
+
+```
+
+  </TabItem>
+  <TabItem value="view_service_js" label="view_service.js">
+
+```javascript title="view_service.js"
+/** @odoo-module **/
+
+import { deepCopy } from "@web/core/utils/objects";
+import { registry } from "@web/core/registry";
+import { generateLegacyLoadViewsResult } from "@web/legacy/legacy_load_views";
+
+/**
+ * @typedef {Object} IrFilter
+ * @property {[number, string] | false} user_id
+ * @property {string} sort
+ * @property {string} context
+ * @property {string} name
+ * @property {string} domain
+ * @property {number} id
+ * @property {boolean} is_default
+ * @property {string} model_id
+ * @property {[number, string] | false} action_id
+ */
+
+/**
+ * @typedef {Object} ViewDescription
+ * @property {string} arch
+ * @property {number|false} id
+ * @property {number|null} [custom_view_id]
+ * @property {Object} [actionMenus] // for views other than search
+ * @property {IrFilter[]} [irFilters] // for search view
+ */
+
+/**
+ * @typedef {Object} LoadViewsParams
+ * @property {string} resModel
+ * @property {[number, string][]} views
+ * @property {Object} context
+ */
+
+/**
+ * @typedef {Object} LoadViewsOptions
+ * @property {number|false} actionId
+ * @property {boolean} loadActionMenus
+ * @property {boolean} loadIrFilters
+ */
+
+/**
+ * @typedef {Object} LoadFieldsOptions
+ * @property {string[] | false} [fieldNames]
+ * @property {string[]} [attributes]
+ */
+
+export const viewService = {
+    dependencies: ["orm"],
+    start(env, { orm }) {
+        let cache = {};
+
+        env.bus.addEventListener("CLEAR-CACHES", () => {
+            cache = {};
+            const processedArchs = registry.category("__processed_archs__");
+            processedArchs.content = {};
+            processedArchs.trigger("UPDATE");
+        });
+
+        /**
+         * Loads fields information
+         *
+         * @param {string} resModel
+         * @param {LoadFieldsOptions} [options]
+         * @returns {Promise<object>}
+         */
+        async function loadFields(resModel, options = {}) {
+            const key = JSON.stringify([
+                "fields",
+                resModel,
+                options.fieldNames,
+                options.attributes,
+            ]);
+            if (!cache[key]) {
+                cache[key] = orm
+                    .call(resModel, "fields_get", [options.fieldNames, options.attributes])
+                    .catch((error) => {
+                        delete cache[key];
+                        return Promise.reject(error);
+                    });
+            }
+            return cache[key];
+        }
+
+        /**
+         * Loads various information concerning views: fields_view for each view,
+         * fields of the corresponding model, and optionally the filters.
+         *
+         * @param {LoadViewsParams} params
+         * @param {LoadViewsOptions} [options={}]
+         * @returns {Promise<ViewDescriptions>}
+         */
+        async function loadViews(params, options = {}) {
+            const loadViewsOptions = {
+                action_id: options.actionId || false,
+                load_filters: options.loadIrFilters || false,
+                toolbar: options.loadActionMenus || false,
+            };
+            if (env.isSmall) {
+                loadViewsOptions.mobile = true;
+            }
+            const { context, resModel, views } = params;
+            const filteredContext = Object.fromEntries(
+                Object.entries(context || {}).filter((k, v) => !String(k).startsWith("default_"))
+            );
+            const key = JSON.stringify([resModel, views, filteredContext, loadViewsOptions]);
+            if (!cache[key]) {
+                cache[key] = orm
+                    .call(resModel, "get_views", [], { context, views, options: loadViewsOptions })
+                    .then((result) => {
+                        const { models, views } = result;
+                        const modelsCopy = deepCopy(models); // for legacy views
+                        const viewDescriptions = {
+                            __legacy__: generateLegacyLoadViewsResult(resModel, views, modelsCopy),
+                            fields: models[resModel],
+                            relatedModels: models,
+                            views: {},
+                        };
+                        for (const [resModel, fields] of Object.entries(modelsCopy)) {
+                            const key = JSON.stringify(["fields", resModel, undefined, undefined]);
+                            cache[key] = Promise.resolve(fields);
+                        }
+                        for (const viewType in views) {
+                            const { arch, toolbar, id, filters, custom_view_id } = views[viewType];
+                            const viewDescription = { arch, id, custom_view_id };
+                            if (toolbar) {
+                                viewDescription.actionMenus = toolbar;
+                            }
+                            if (filters) {
+                                viewDescription.irFilters = filters;
+                            }
+                            viewDescriptions.views[viewType] = viewDescription;
+                        }
+                        return viewDescriptions;
+                    })
+                    .catch((error) => {
+                        delete cache[key];
+                        return Promise.reject(error);
+                    });
+            }
+            return cache[key];
+        }
+        return { loadViews, loadFields };
+    },
+};
+
+registry.category("services").add("view", viewService);
+
+```
+
+  </TabItem>
+  <TabItem value="ir_ui_view_py" label="ir_ui_view(Model)">
+
+```python title="ir_ui_view.py"
+class Model(models.AbstractModel):
+    _inherit = 'base'
+
+    _date_name = 'date'         #: field to use for default calendar view
+
+    def _get_access_action(self, access_uid=None, force_website=False):
+        """ Return an action to open the document. This method is meant to be
+        overridden in addons that want to give specific access to the document.
+        By default, it opens the formview of the document.
+
+        :param integer access_uid: optional access_uid being the user that
+            accesses the document. May be different from the current user as we
+            may compute an access for someone else.
+        :param integer force_website: force frontend redirection if available
+            on self. Used in overrides, notably with portal / website addons.
+        """
+        self.ensure_one()
+        return self.get_formview_action(access_uid=access_uid)
+
+    @api.model
+    def get_empty_list_help(self, help_message):
+        """ Hook method to customize the help message in empty list/kanban views.
+
+        By default, it returns the help received as parameter.
+
+        :param str help: ir.actions.act_window help content
+        :return: help message displayed when there is no result to display
+          in a list/kanban view (by default, it returns the action help)
+        :rtype: str
+        """
+        return help_message
+
+    #
+    # Override this method if you need a window title that depends on the context
+    #
+    @api.model
+    def view_header_get(self, view_id=None, view_type='form'):
+        return False
+
+    @api.model
+    def _get_default_form_view(self):
+        """ Generates a default single-line form view using all fields
+        of the current model.
+
+        :returns: a form view as an lxml document
+        :rtype: etree._Element
+        """
+        sheet = E.sheet(string=self._description)
+        main_group = E.group()
+        left_group = E.group()
+        right_group = E.group()
+        for fname, field in self._fields.items():
+            if field.automatic:
+                continue
+            elif field.type in ('one2many', 'many2many', 'text', 'html'):
+                # append to sheet left and right group if needed
+                if len(left_group) > 0:
+                    main_group.append(left_group)
+                    left_group = E.group()
+                if len(right_group) > 0:
+                    main_group.append(right_group)
+                    right_group = E.group()
+                if len(main_group) > 0:
+                    sheet.append(main_group)
+                    main_group = E.group()
+                # add an oneline group for field type 'one2many', 'many2many', 'text', 'html'
+                sheet.append(E.group(E.field(name=fname)))
+            else:
+                if len(left_group) > len(right_group):
+                    right_group.append(E.field(name=fname))
+                else:
+                    left_group.append(E.field(name=fname))
+        if len(left_group) > 0:
+            main_group.append(left_group)
+        if len(right_group) > 0:
+            main_group.append(right_group)
+        sheet.append(main_group)
+        sheet.append(E.group(E.separator()))
+        return E.form(sheet)
+
+    @api.model
+    def _get_default_search_view(self):
+        """ Generates a single-field search view, based on _rec_name.
+
+        :returns: a tree view as an lxml document
+        :rtype: etree._Element
+        """
+        element = E.field(name=self._rec_name_fallback())
+        return E.search(element, string=self._description)
+
+    @api.model
+    def _get_default_tree_view(self):
+        """ Generates a single-field tree view, based on _rec_name.
+
+        :returns: a tree view as an lxml document
+        :rtype: etree._Element
+        """
+        element = E.field(name=self._rec_name_fallback())
+        return E.tree(element, string=self._description)
+
+    @api.model
+    def _get_default_pivot_view(self):
+        """ Generates an empty pivot view.
+
+        :returns: a pivot view as an lxml document
+        :rtype: etree._Element
+        """
+        return E.pivot(string=self._description)
+
+    @api.model
+    def _get_default_kanban_view(self):
+        """ Generates a single-field kanban view, based on _rec_name.
+
+        :returns: a kanban view as an lxml document
+        :rtype: etree._Element
+        """
+
+        field = E.field(name=self._rec_name_fallback())
+        content_div = E.div(field, {'class': "o_kanban_card_content"})
+        card_div = E.div(content_div, {'t-attf-class': "oe_kanban_card oe_kanban_global_click"})
+        kanban_box = E.t(card_div, {'t-name': "kanban-box"})
+        templates = E.templates(kanban_box)
+        return E.kanban(templates, string=self._description)
+
+    @api.model
+    def _get_default_graph_view(self):
+        """ Generates a single-field graph view, based on _rec_name.
+
+        :returns: a graph view as an lxml document
+        :rtype: etree._Element
+        """
+        element = E.field(name=self._rec_name_fallback())
+        return E.graph(element, string=self._description)
+
+    @api.model
+    def _get_default_calendar_view(self):
+        """ Generates a default calendar view by trying to infer
+        calendar fields from a number of pre-set attribute names
+
+        :returns: a calendar view
+        :rtype: etree._Element
+        """
+        def set_first_of(seq, in_, to):
+            """Sets the first value of ``seq`` also found in ``in_`` to
+            the ``to`` attribute of the ``view`` being closed over.
+
+            Returns whether it's found a suitable value (and set it on
+            the attribute) or not
+            """
+            for item in seq:
+                if item in in_:
+                    view.set(to, item)
+                    return True
+            return False
+
+        view = E.calendar(string=self._description)
+        view.append(E.field(name=self._rec_name_fallback()))
+
+        if not set_first_of([self._date_name, 'date', 'date_start', 'x_date', 'x_date_start'],
+                            self._fields, 'date_start'):
+            raise UserError(_("Insufficient fields for Calendar View!"))
+
+        set_first_of(["user_id", "partner_id", "x_user_id", "x_partner_id"],
+                     self._fields, 'color')
+
+        if not set_first_of(["date_stop", "date_end", "x_date_stop", "x_date_end"],
+                            self._fields, 'date_stop'):
+            if not set_first_of(["date_delay", "planned_hours", "x_date_delay", "x_planned_hours"],
+                                self._fields, 'date_delay'):
+                raise UserError(_(
+                    "Insufficient fields to generate a Calendar View for %s, missing a date_stop or a date_delay",
+                    self._name
+                ))
+
+        return view
+
+    @api.model
+    def get_views(self, views, options=None):
+        """ Returns the fields_views of given views, along with the fields of
+        the current model, and optionally its filters for the given action.
+
+        :param views: list of [view_id, view_type]
+        :param dict options: a dict optional boolean flags, set to enable:
+
+            ``toolbar``
+                includes contextual actions when loading fields_views
+            ``load_filters``
+                returns the model's filters
+            ``action_id``
+                id of the action to get the filters, otherwise loads the global
+                filters or the model
+
+        :return: dictionary with fields_views, fields and optionally filters
+        """
+        options = options or {}
+        result = {}
+
+        result['views'] = {
+            v_type: self.get_view(
+                v_id, v_type if v_type != 'list' else 'tree',
+                **options
+            )
+            for [v_id, v_type] in views
+        }
+
+        models = {}
+        for view in result['views'].values():
+            for model, model_fields in view.pop('models').items():
+                models.setdefault(model, set()).update(model_fields)
+
+        result['models'] = {}
+
+        for model, model_fields in models.items():
+            result['models'][model] = self.env[model].fields_get(
+                allfields=model_fields, attributes=self._get_view_field_attributes()
+            )
+
+        # Add related action information if asked
+        if options.get('toolbar'):
+            for view in result['views'].values():
+                view['toolbar'] = {}
+
+            bindings = self.env['ir.actions.actions'].get_bindings(self._name)
+            for action_type, key in (('report', 'print'), ('action', 'action')):
+                for action in bindings.get(action_type, []):
+                    view_types = (
+                        action['binding_view_types'].split(',')
+                        if action.get('binding_view_types')
+                        else result['views'].keys()
+                    )
+                    for view_type in view_types:
+                        view_type = view_type if view_type != 'tree' else 'list'
+                        if view_type in result['views']:
+                            result['views'][view_type]['toolbar'].setdefault(key, []).append(action)
+
+        if options.get('load_filters') and 'search' in result['views']:
+            result['views']['search']['filters'] = self.env['ir.filters'].get_filters(
+                self._name, options.get('action_id')
+            )
+
+        return result
+
+    @api.model
+    def _get_view(self, view_id=None, view_type='form', **options):
+        """_get_view([view_id | view_type='form'])
+
+        Get the model view combined architecture (the view along all its inheriting views).
+
+        :param int view_id: id of the view or None
+        :param str view_type: type of the view to return if view_id is None ('form', 'tree', ...)
+        :param dict options: bool options to return additional features:
+            - bool mobile: true if the web client is currently using the responsive mobile view
+              (to use kanban views instead of list views for x2many fields)
+        :return: architecture of the view as an etree node, and the browse record of the view used
+        :rtype: tuple
+        :raise AttributeError:
+
+            * if no view exists for that model, and no method `_get_default_[view_type]_view` exists for the view type
+
+        """
+        View = self.env['ir.ui.view'].sudo()
+
+        # try to find a view_id if none provided
+        if not view_id:
+            # <view_type>_view_ref in context can be used to override the default view
+            view_ref_key = view_type + '_view_ref'
+            view_ref = self._context.get(view_ref_key)
+            if view_ref:
+                if '.' in view_ref:
+                    module, view_ref = view_ref.split('.', 1)
+                    query = "SELECT res_id FROM ir_model_data WHERE model='ir.ui.view' AND module=%s AND name=%s"
+                    self._cr.execute(query, (module, view_ref))
+                    view_ref_res = self._cr.fetchone()
+                    if view_ref_res:
+                        view_id = view_ref_res[0]
+                else:
+                    _logger.warning(
+                        '%r requires a fully-qualified external id (got: %r for model %s). '
+                        'Please use the complete `module.view_id` form instead.', view_ref_key, view_ref,
+                        self._name
+                    )
+
+            if not view_id:
+                # otherwise try to find the lowest priority matching ir.ui.view
+                view_id = View.default_view(self._name, view_type)
+
+        if view_id:
+            # read the view with inherited views applied
+            view = View.browse(view_id)
+            arch = view._get_combined_arch()
+        else:
+            # fallback on default views methods if no ir.ui.view could be found
+            view = View.browse()
+            try:
+                arch = getattr(self, '_get_default_%s_view' % view_type)()
+            except AttributeError:
+                raise UserError(_("No default view of type '%s' could be found !", view_type))
+        return arch, view
+
+    @api.model
+    def _get_view_cache_key(self, view_id=None, view_type='form', **options):
+        """ Get the key to use for caching `_get_view_cache`.
+
+        This method is meant to be overriden by models needing additional keys.
+
+        :param int view_id: id of the view or None
+        :param str view_type: type of the view to return if view_id is None ('form', 'tree', ...)
+        :param dict options: bool options to return additional features:
+            - bool mobile: true if the web client is currently using the responsive mobile view
+              (to use kanban views instead of list views for x2many fields)
+        :return: a cache key
+        :rtype: tuple
+        """
+        return (view_id, view_type, options.get('mobile'), self.env.lang) + tuple(
+            (key, value) for key, value in self.env.context.items() if key.endswith('_view_ref')
+        )
+
+    @api.model
+    @tools.conditional(
+        'xml' not in config['dev_mode'],
+        tools.ormcache('self._get_view_cache_key(view_id, view_type, **options)'),
+    )
+    def _get_view_cache(self, view_id=None, view_type='form', **options):
+        """ Get the view information ready to be cached
+
+        The cached view includes the postprocessed view, including inherited views, for all groups.
+        The blocks restricted to groups must therefore be removed after calling this method
+        for users not part of the given groups.
+
+        :param int view_id: id of the view or None
+        :param str view_type: type of the view to return if view_id is None ('form', 'tree', ...)
+        :param dict options: boolean options to return additional features:
+            - bool mobile: true if the web client is currently using the responsive mobile view
+              (to use kanban views instead of list views for x2many fields)
+        :return: a dictionnary including
+            - string arch: the architecture of the view (including inherited views, postprocessed, for all groups)
+            - int id: the view id
+            - string model: the view model
+            - dict models: the fields of the models used in the view (including sub-views)
+        :rtype: dict
+        """
+        # Get the view arch and all other attributes describing the composition of the view
+        arch, view = self._get_view(view_id, view_type, **options)
+
+        # Apply post processing, groups and modifiers etc...
+        arch, models = view.postprocess_and_fields(arch, model=self._name, **options)
+        models = self._get_view_fields(view_type or view.type, models)
+        result = {
+            'arch': arch,
+            # TODO: only `web_studio` seems to require this. I guess this is acceptable to keep it.
+            'id': view.id,
+            # TODO: only `web_studio` seems to require this. But this one on the other hand should be eliminated:
+            # you just called `get_views` for that model, so obviously the web client already knows the model.
+            'model': self._name,
+            # Set a frozendict and tuple for the field list to make sure the value in cache cannot be updated.
+            'models': frozendict({model: tuple(fields) for model, fields in models.items()}),
+        }
+
+        return frozendict(result)
+
+    @api.model
+    def get_view(self, view_id=None, view_type='form', **options):
+        """ get_view([view_id | view_type='form'])
+
+        Get the detailed composition of the requested view like model, view architecture
+
+        :param int view_id: id of the view or None
+        :param str view_type: type of the view to return if view_id is None ('form', 'tree', ...)
+        :param dict options: boolean options to return additional features:
+            - bool mobile: true if the web client is currently using the responsive mobile view
+            (to use kanban views instead of list views for x2many fields)
+        :return: composition of the requested view (including inherited views and extensions)
+        :rtype: dict
+        :raise AttributeError:
+
+            * if the inherited view has unknown position to work with other than 'before', 'after', 'inside', 'replace'
+            * if some tag other than 'position' is found in parent view
+
+        :raise Invalid ArchitectureError: if there is view type other than form, tree, calendar, search etc... defined on the structure
+        """
+        self.check_access_rights('read')
+
+        result = dict(self._get_view_cache(view_id, view_type, **options))
+
+        node = etree.fromstring(result['arch'])
+        node = self.env['ir.ui.view']._postprocess_access_rights(node)
+        node = self.env['ir.ui.view']._postprocess_context_dependent(node)
+        result['arch'] = etree.tostring(node, encoding="unicode").replace('\t', '')
+
+        return result
+
+    @api.model
+    def _get_view_fields(self, view_type, models):
+        """ Returns the field names required by the web client to load the views according to the view type.
+
+        The method is meant to be overridden by modules extending web client features and requiring additional
+        fields.
+
+        :param string view_type: type of the view
+        :param dict models: dict holding the models and fields used in the view architecture.
+        :return: dict holding the models and field required by the web client given the view type.
+        :rtype: list
+        """
+        if view_type in ('kanban', 'tree', 'form'):
+            for model_fields in models.values():
+                model_fields.update({'id', self.CONCURRENCY_CHECK_FIELD})
+        elif view_type == 'search':
+            models[self._name] = list(self._fields.keys())
+        elif view_type == 'graph':
+            models[self._name].union(fname for fname, field in self._fields.items() if field.type in ('integer', 'float'))
+        elif view_type == 'pivot':
+            models[self._name].union(fname for fname, field in self._fields.items() if field.groupable)
+        return models
+
+    @api.model
+    def _get_view_field_attributes(self):
+        """ Returns the field attributes required by the web client to load the views.
+
+        The method is meant to be overridden by modules extending web client features and requiring additional
+        field attributes.
+
+        :return: string list of field attribute names
+        :rtype: list
+        """
+        return [
+            'change_default', 'context', 'currency_field', 'definition_record', 'digits', 'domain', 'group_operator', 'groups',
+            'help', 'name', 'readonly', 'related', 'relation', 'relation_field', 'required', 'searchable', 'selection', 'size',
+            'sortable', 'store', 'string', 'translate', 'trim', 'type',
+        ]
+
+    @api.model
+    def load_views(self, views, options=None):
+        warnings.warn(
+            '`load_views` method is deprecated, use `get_views` instead',
+            DeprecationWarning, stacklevel=2,
+        )
+        return self.get_views(views, options=options)
+
+    @api.model
+    def _fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
+        warnings.warn(
+            'Method `_fields_view_get` is deprecated, use `_get_view` instead',
+            DeprecationWarning, stacklevel=2,
+        )
+        arch, view = self._get_view(view_id, view_type, toolbar=toolbar, submenu=submenu)
+        result = {
+            'arch': etree.tostring(arch, encoding='unicode'),
+            'model': self._name,
+            'field_parent': False,
+        }
+        if view:
+            result['name'] = view.name
+            result['type'] = view.type
+            result['view_id'] = view.id
+            result['field_parent'] = view.field_parent
+            result['base_model'] = view.model
+        else:
+            result['type'] = view_type
+            result['name'] = 'default'
+        return result
+
+    @api.model
+    def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
+        """
+        .. deprecated:: saas-15.4
+
+            Use :meth:`~odoo.models.Model.get_view()` instead.
+        """
+        warnings.warn(
+            'Method `fields_view_get` is deprecated, use `get_view` instead',
+            DeprecationWarning, stacklevel=2,
+        )
+        result = self.get_views([(view_id, view_type)], {'toolbar': toolbar, 'submenu': submenu})['views'][view_type]
+        node = etree.fromstring(result['arch'])
+        view_fields = set(el.get('name') for el in node.xpath('.//field[not(ancestor::field)]'))
+        result['fields'] = self.fields_get(view_fields)
+        result.pop('models', None)
+        if 'id' in result:
+            view = self.env['ir.ui.view'].sudo().browse(result.pop('id'))
+            result['name'] = view.name
+            result['type'] = view.type
+            result['view_id'] = view.id
+            result['field_parent'] = view.field_parent
+            result['base_model'] = view.model
+        else:
+            result['type'] = view_type
+            result['name'] = 'default'
+            result['field_parent'] = False
+        return result
+
+    def get_formview_id(self, access_uid=None):
+        """ Return a view id to open the document ``self`` with. This method is
+            meant to be overridden in addons that want to give specific view ids
+            for example.
+
+            Optional access_uid holds the user that would access the form view
+            id different from the current environment user.
+        """
+        return False
+
+    def get_formview_action(self, access_uid=None):
+        """ Return an action to open the document ``self``. This method is meant
+            to be overridden in addons that want to give specific view ids for
+            example.
+
+        An optional access_uid holds the user that will access the document
+        that could be different from the current user. """
+        view_id = self.sudo().get_formview_id(access_uid=access_uid)
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': self._name,
+            'view_type': 'form',
+            'view_mode': 'form',
+            'views': [(view_id, 'form')],
+            'target': 'current',
+            'res_id': self.id,
+            'context': dict(self._context),
+        }
+
+    @api.model
+    def _onchange_spec(self, view_info=None):
+        """ Return the onchange spec from a view description; if not given, the
+            result of ``self.get_view()`` is used.
+        """
+        result = {}
+
+        # for traversing the XML arch and populating result
+        def process(node, info, prefix):
+            if node.tag == 'field':
+                name = node.attrib['name']
+                names = "%s.%s" % (prefix, name) if prefix else name
+                if not result.get(names):
+                    result[names] = node.attrib.get('on_change')
+                # traverse the subviews included in relational fields
+                for child_view in node.xpath("./*[descendant::field]"):
+                    process(child_view, None, names)
+            else:
+                for child in node:
+                    process(child, info, prefix)
+
+        if view_info is None:
+            view_info = self.get_view()
+        process(etree.fromstring(view_info['arch']), view_info, '')
+        return result
+```
+
+  </TabItem>
+</Tabs>
