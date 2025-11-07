@@ -131,6 +131,13 @@ ActionMenus
 
 #### `items` 对象结构
 
+ActionMenus的items主要分为以下类别：
+- `printItems`: 取值于`props.items.other`.
+- `actionItems`:
+    - `callbackActions`: 取值于`props.items.other`.
+    - `formattedActions`: 取值于`props.items.action`.
+    - `registryActions`: 取值于`registry.category("action_menus").getAll()`.
+
 ```javascript
 {
     action: Array,    // 基于 Action ID 的操作项
