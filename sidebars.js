@@ -82,8 +82,16 @@ const sidebars = {
                 label: 'Views',
                 items: [
                     'odoo/dev_notes/source_code_analysis/views/list_view_open_record_dynamic',
+                    'odoo/dev_notes/source_code_analysis/views/views_binding_actions',
                 ]
              },
+             {
+                type: 'category',
+                label: 'Components',
+                items: [
+                    'odoo/dev_notes/source_code_analysis/components/action_menus_analyze',
+                ]
+              },
             'odoo/dev_notes/check_credentials',
             'odoo/dev_notes/xml_rpc',
             'odoo/dev_notes/owl_dialog',
