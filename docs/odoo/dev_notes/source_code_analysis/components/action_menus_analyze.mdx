@@ -1,0 +1,574 @@
+---
+title: ActionMenus
+description: ActionMenus
+sidebar_label: ActionMenus
+keyword:
+    - odoo
+    - odoo development
+tags: [odoo]
+last_update:
+  date: 2025/11/7
+  author: Lucas
+---
+
+import Tabs from '@theme/Tabs';
+
+import TabItem from '@theme/TabItem';
+
+# ActionMenus 组件
+
+## 目录
+
+- [1. 概述](#1-概述)
+- [2. 架构设计](#2-架构设计)
+- [3. 依赖关系](#3-依赖关系)
+- [4. API 文档](#4-api-文档)
+- [5. 核心方法详解](#5-核心方法详解)
+- [6. 生命周期](#6-生命周期)
+- [7. 数据流](#7-数据流)
+- [8. 使用示例](#8-使用示例)
+- [9. 扩展机制](#9-扩展机制)
+- [10. 最佳实践](#10-最佳实践)
+
+---
+
+## 1. 概述
+
+### 1.1 组件简介
+
+`ActionMenus` 是 Odoo 16 中用于显示和执行操作菜单的组件，位于控制面板左侧，提供“打印”和“操作”两个下拉菜单。
+
+### 1.2 主要功能
+
+- 显示打印操作菜单
+- 显示自定义操作菜单
+- 执行操作（回调、Action ID、URL）
+- 支持注册表扩展
+- 处理活动记录上下文
+
+### 1.3 文件位置
+
+```
+addons/web/static/src/search/action_menus/action_menus.js
+```
+
+---
+
+## 2. 架构设计
+
+### 2.1 类继承关系
+
+```
+Component (OWL)
+    ↓
+ActionMenus
+```
+
+### 2.2 组件结构
+
+```
+ActionMenus
+├── setup()                    # 初始化方法
+├── printItems                 # 打印项访问器
+├── setActionItems()           # 设置操作项（私有）
+├── executeAction()            # 执行操作
+└── onItemSelected()           # 处理选择事件
+```
+
+### 2.3 组件配置
+
+- **子组件**: `Dropdown`, `DropdownItem`
+- **模板**: `web.ActionMenus`
+- **Props**: 见 [API 文档](#4-api-文档)
+
+---
+
+## 3. 依赖关系
+
+### 3.1 核心依赖
+
+| 依赖 | 来源 | 用途 |
+|------|------|------|
+| `browser` | `@web/core/browser/browser` | 浏览器操作（URL 跳转） |
+| `makeContext` | `@web/core/context` | 上下文合并 |
+| `session` | `@web/session` | 会话信息（`active_ids_limit`） |
+| `registry` | `@web/core/registry` | 注册表管理 |
+| `Dropdown` | `@web/core/dropdown/dropdown` | 下拉菜单组件 |
+| `DropdownItem` | `@web/core/dropdown/dropdown_item` | 下拉菜单项组件 |
+| `useService` | `@web/core/utils/hooks` | 服务注入 Hook |
+| `Component` | `@odoo/owl` | OWL 组件基类 |
+| `onWillStart` | `@odoo/owl` | 生命周期 Hook |
+| `onWillUpdateProps` | `@odoo/owl` | 属性更新 Hook |
+
+### 3.2 服务依赖
+
+- **ORM 服务**: 用于数据库搜索操作
+- **Action 服务**: 用于执行 Odoo 动作
+
+---
+
+## 4. API 文档
+
+### 4.1 Props 定义
+
+#### 必需属性
+
+| 属性名 | 类型 | 说明 |
+|--------|------|------|
+| `getActiveIds` | `Function` | 获取当前活动记录 ID 的函数 |
+| `context` | `Object` | Odoo 上下文对象 |
+| `resModel` | `String` | 资源模型名称 |
+
+#### 可选属性
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `domain` | `Array` | - | 搜索域 |
+| `isDomainSelected` | `Boolean` | - | 是否按域选择记录 |
+| `items` | `Object` | - | 操作项配置对象 |
+| `onActionExecuted` | `Function` | `() => {}` | 操作执行后的回调 |
+| `shouldExecuteAction` | `Function` | `() => true` | 判断是否执行操作 |
+
+#### `items` 对象结构
+
+```javascript
+{
+    action: Array,    // 基于 Action ID 的操作项
+    print: Array,     // 打印操作项
+    other: Array     // 基于回调的操作项
+}
+```
+
+### 4.2 方法 API
+
+#### `setup()`
+
+初始化组件，设置服务依赖和生命周期钩子。
+
+**执行时机**: 组件创建时
+
+**功能**:
+- 注入 ORM 服务
+- 注入 Action 服务
+- 注册 `onWillStart` 钩子
+- 注册 `onWillUpdateProps` 钩子
+
+#### `printItems` (Getter)
+
+获取格式化的打印操作项列表。
+
+**返回**: `Array<Object>`
+
+**返回对象结构**:
+```javascript
+{
+    action: Object,      // 原始操作对象
+    description: String, // 操作描述
+    key: String         // 唯一键（action.id）
+}
+```
+
+#### `setActionItems(props)` (私有方法)
+
+异步设置操作项列表。
+
+**参数**:
+- `props`: 组件属性对象
+
+**返回**: `Promise<Array>`
+
+**处理逻辑**:
+1. 处理回调型操作（`props.items.other`）
+2. 处理操作型操作（`props.items.action`）
+3. 处理注册表型操作（从 `action_menus` 注册表获取）
+
+#### `executeAction(action)`
+
+执行 Odoo 动作。
+
+**参数**:
+- `action`: 动作对象，必须包含 `id` 属性
+
+**返回**: `Promise`
+
+**执行流程**:
+1. 获取活动记录 ID（直接获取或通过域搜索）
+2. 构建活动记录上下文
+3. 合并上下文
+4. 调用 Action 服务执行动作
+
+#### `onItemSelected(item)`
+
+处理菜单项选择事件。
+
+**参数**:
+- `item`: 选中的菜单项对象
+
+**执行逻辑**:
+1. 检查是否允许执行（`shouldExecuteAction`）
+2. 根据项类型执行：
+   - `item.callback`: 执行回调函数
+   - `item.action`: 执行 Odoo 动作
+   - `item.url`: 跳转到 URL
+
+---
+
+## 5. 核心方法详解
+
+### 5.1 `setActionItems()` 方法
+
+```javascript
+async setActionItems(props) {
+    // 1. 处理回调型操作
+    const callbackActions = (props.items.other || []).map((action) =>
+        Object.assign({ key: `action-${action.description}` }, action)
+    );
+
+    // 2. 处理操作型操作
+    const actionActions = props.items.action || [];
+    const formattedActions = actionActions.map((action) => ({
+        action,
+        description: action.name,
+        key: action.id,
+    }));
+
+    // 3. 处理注册表型操作
+    const registryActions = [];
+    for (const { Component, getProps } of registry.category("action_menus").getAll()) {
+        const itemProps = await getProps(props, this.env);
+        if (itemProps) {
+            registryActions.push({
+                Component,
+                key: `registry-action-${registryActionId++}`,
+                props: itemProps,
+            });
+        }
+    }
+
+    return [...callbackActions, ...formattedActions, ...registryActions];
+}
+```
+
+**处理流程**:
+
+1. 回调型操作
+   - 来源: `props.items.other`
+   - 处理: 添加唯一键 `action-${description}`
+   - 用途: 由视图控制器提供的自定义回调
+
+2. 操作型操作
+   - 来源: `props.items.action`
+   - 处理: 格式化为统一结构
+   - 用途: 基于 Odoo Action ID 的操作
+
+3. 注册表型操作
+   - 来源: `registry.category("action_menus")`
+   - 处理: 动态加载组件和属性
+   - 用途: 可扩展的操作项
+
+### 5.2 `executeAction()` 方法
+
+```javascript
+async executeAction(action) {
+    // 1. 获取活动记录 ID
+    let activeIds = this.props.getActiveIds();
+    if (this.props.isDomainSelected) {
+        activeIds = await this.orm.search(this.props.resModel, this.props.domain, {
+            limit: session.active_ids_limit,
+            context: this.props.context,
+        });
+    }
+
+    // 2. 构建活动记录上下文
+    const activeIdsContext = {
+        active_id: activeIds[0],
+        active_ids: activeIds,
+        active_model: this.props.resModel,
+    };
+
+    // 3. 添加域信息（向后兼容）
+    if (this.props.domain) {
+        activeIdsContext.active_domain = this.props.domain;
+    }
+
+    // 4. 合并上下文并执行动作
+    const context = makeContext([this.props.context, activeIdsContext]);
+    return this.actionService.doAction(action.id, {
+        additionalContext: context,
+        onClose: this.props.onActionExecuted,
+    });
+}
+```
+
+**上下文构建说明**:
+
+- `active_id`: 第一个活动记录的 ID
+- `active_ids`: 所有活动记录的 ID 数组
+- `active_model`: 资源模型名称
+- `active_domain`: 搜索域（如果存在）
+
+### 5.3 `onItemSelected()` 方法
+
+```javascript
+async onItemSelected(item) {
+    // 1. 检查是否允许执行
+    if (!(await this.props.shouldExecuteAction(item))) {
+        return;
+    }
+
+    // 2. 根据项类型执行
+    if (item.callback) {
+        item.callback([item]);
+    } else if (item.action) {
+        this.executeAction(item.action);
+    } else if (item.url) {
+        browser.location = item.url;
+    }
+}
+```
+
+**执行优先级**:
+1. `callback` > `action` > `url`
+2. 仅执行第一个匹配的类型
+
+---
+
+## 6. 生命周期
+
+### 6.1 生命周期钩子
+
+```
+组件创建
+    ↓
+setup()
+    ↓
+onWillStart()
+    ↓
+setActionItems(props)
+    ↓
+组件渲染
+    ↓
+[属性更新]
+    ↓
+onWillUpdateProps(nextProps)
+    ↓
+setActionItems(nextProps)
+    ↓
+组件更新
+```
+
+### 6.2 生命周期说明
+
+| 阶段 | 钩子 | 执行内容 |
+|------|------|----------|
+| 初始化 | `setup()` | 注入服务，注册生命周期钩子 |
+| 启动前 | `onWillStart()` | 异步加载操作项 |
+| 属性更新前 | `onWillUpdateProps()` | 重新加载操作项 |
+
+---
+
+## 7. 数据流
+
+### 7.1 数据流向图
+
+```
+Props
+  ├── items.print → printItems (Getter)
+  ├── items.action → setActionItems() → actionItems
+  ├── items.other → setActionItems() → actionItems
+  └── registry → setActionItems() → actionItems
+       ↓
+   模板渲染
+       ↓
+   用户选择
+       ↓
+   onItemSelected()
+       ↓
+   executeAction() / callback() / URL跳转
+```
+
+### 7.2 上下文传递
+
+```
+组件 Props
+    ↓
+executeAction()
+    ↓
+构建 activeIdsContext
+    ↓
+合并上下文 (makeContext)
+    ↓
+actionService.doAction()
+```
+
+---
+
+## 8. 使用示例
+
+参考`ListController`/`FormController`.
+
+```xml title="list_controller.xml"
+<ActionMenus
+    getActiveIds="() => model.root.selection.map((r) => r.resId)"
+    context="props.context"
+    domain="props.domain"
+    items="getActionMenuItems()"
+    isDomainSelected="model.root.isDomainSelected"
+    resModel="model.root.resModel"
+    onActionExecuted="() => model.load()"/>
+```
+
+```javascript title="list_controller.js"
+export class ListController extends Component{
+    // ...
+    getActionMenuItems() {
+        const isM2MGrouped = this.model.root.isM2MGrouped;
+        const otherActionItems = [];
+        if (this.isExportEnable) {
+            otherActionItems.push({
+                key: "export",
+                description: this.env._t("Export"),
+                callback: () => this.onExportData(),
+            });
+        }
+        if (this.archiveEnabled && !isM2MGrouped) {
+            otherActionItems.push({
+                key: "archive",
+                description: this.env._t("Archive"),
+                callback: () => {
+                    const dialogProps = {
+                        body: this.env._t(
+                            "Are you sure that you want to archive all the selected records?"
+                        ),
+                        confirm: () => {
+                            this.toggleArchiveState(true);
+                        },
+                        cancel: () => {},
+                    };
+                    this.dialogService.add(ConfirmationDialog, dialogProps);
+                },
+            });
+            otherActionItems.push({
+                key: "unarchive",
+                description: this.env._t("Unarchive"),
+                callback: () => this.toggleArchiveState(false),
+            });
+        }
+        if (this.activeActions.delete && !isM2MGrouped) {
+            otherActionItems.push({
+                key: "delete",
+                description: this.env._t("Delete"),
+                callback: () => this.onDeleteSelectedRecords(),
+            });
+        }
+        return Object.assign({}, this.props.info.actionMenus, { other: otherActionItems });
+    }
+}
+```
+
+---
+
+## 9. 扩展机制
+
+### 9.1 注册表扩展
+
+通过 `registry.category("action_menus")` 注册自定义操作项：
+
+```javascript
+import { registry } from "@web/core/registry";
+
+registry.category("action_menus").add("my_custom_action", {
+    Component: MyCustomActionComponent,
+    getProps: async (props, env) => {
+        // 返回 null 表示不显示此操作项
+        if (!shouldShow(props)) {
+            return null;
+        }
+
+        // 返回属性对象
+        return {
+            recordIds: props.getActiveIds(),
+            model: props.resModel,
+        };
+    },
+});
+```
+
+### 9.2 扩展组件要求
+
+- 必须实现 `Component` 属性（OWL 组件类）
+- 必须实现 `getProps` 方法（返回属性对象或 `null`）
+- `getProps` 方法必须是异步的
+
+---
+
+## 10. 最佳实践
+
+### 10.1 性能优化
+
+1. 使用 `shouldExecuteAction` 提前过滤不需要的操作
+2. 注册表操作项应快速返回 `null` 以跳过不相关项
+3. 避免在 `getProps` 中执行耗时操作
+
+### 10.2 错误处理
+
+```javascript
+// 在 executeAction 中添加错误处理
+async executeAction(action) {
+    try {
+        // ... 执行逻辑
+    } catch (error) {
+        console.error("执行操作失败:", error);
+        // 显示错误提示
+    }
+}
+```
+
+### 10.3 上下文管理
+
+- 避免在上下文中传递大量数据
+- 使用 `active_domain` 而非 `active_ids` 处理大量记录
+- 保持上下文结构清晰
+
+### 10.4 可维护性
+
+- 为操作项提供清晰的描述
+- 使用有意义的键值
+- 保持回调函数简洁
+- 添加适当的注释
+
+---
+
+## 11. 注意事项
+
+### 11.1 限制
+
+- `active_ids_limit` 限制活动记录数量（由 `session.active_ids_limit` 定义）
+- 使用 `active_domain` 可绕过此限制
+
+### 11.2 兼容性
+
+- `active_domain` 保留用于向后兼容
+- 支持旧版本的回调接口
+
+### 11.3 安全
+
+- 验证 `shouldExecuteAction` 返回值
+- 检查操作权限
+- 验证输入数据
+
+---
+
+## 12. 相关文件
+
+- **模板文件**: `addons/web/static/src/search/action_menus/action_menus.xml`
+- **相关组件**: `Dropdown`, `DropdownItem`
+- **相关服务**: `orm`, `action`
+
+---
+
+## 13. 版本信息
+
+- **Odoo 版本**: 16.0
+
+---
