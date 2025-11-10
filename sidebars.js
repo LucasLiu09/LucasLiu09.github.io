@@ -138,6 +138,7 @@ const sidebars = {
              items: [
                 'odoo/dev_notes/front-end/fields/integer_field_extend',
                 'odoo/dev_notes/front-end/fields/float_field_extend',
+                'odoo/dev_notes/front-end/fields/x2many_field_extend',
              ]
            },
           ]
