@@ -1,0 +1,107 @@
+---
+title: ListView扩展
+description: ListView扩展
+sidebar_label: ListView扩展
+keyword:
+    - odoo
+    - odoo development
+tags: [odoo]
+last_update:
+  date: 2025/11/10
+  author: Lucas
+---
+
+# ListView扩展
+
+:::info[Note]
+
+对ListView做一些改造，以实现更多的功能。
+
+--odoo version: 16
+
+:::
+
+## 在`<Field/>`标签设置标题行class
+
+通过在`<field/>`标签内设置`options`属性对应`thClassNames`为`key`的值，向`list`表格的标题行添加`class`。
+
+```javascript
+/** @odoo-module **/
+import { ListRenderer } from "@web/views/list/list_renderer";
+import { patch } from "@web/core/utils/patch";
+
+patch(ListRenderer.prototype, "ListRenderer.patch.addHeaderClass", {
+    getColumnClass(column){
+        const classNamesString = this._super(column);
+        const classNames = classNamesString.split(" ");
+        if (column.options && column.options.thClassNames){
+            classNames.push(...column.options.thClassNames.split(" "));
+        }
+        return classNames.join(" ");
+    },
+});
+```
+
+使用示例
+
+```xml
+<field name="project_id" options="{'thClassNames': "text-primary text-end"}" />
+```
+
+## 双击打开视图
+
+通过修改listRenderer，实现双击列表记录的事件。
+
+:::tip[💡单击跳转视图]
+单击跳转视图可以查阅[文档](/odoo/dev_notes/source_code_analysis/views/list_view_open_record_dynamic)
+:::
+
+> 以下为`js_class`方式实现，可根据需要修改为`patch`。
+
+```javascript
+/** @odoo-module **/
+
+import { useService } from "@web/core/utils/hooks";
+import { registry } from "@web/core/registry";
+import { ListRenderer } from "@web/views/list/list_renderer";
+import { listView } from "@web/views/list/list_view";
+
+class ListDoubleClickDoAction extends ListRenderer {
+    setup(){
+        super.setup();
+        this.action = useService("action");
+        this.orm = useService("orm");
+    }
+
+    async onDoubleClicked(record, ev){
+        try{
+            const action = this.orm.call(record.resModel, "custom_double_click_action", [record.resId]);
+            await this.action.doAction(action);
+        } catch (e) {
+            console.log('list double click error: ', e);
+        }
+    }
+}
+ListDoubleClickDoAction.recordRowTemplate = "ListDoubleClickDoAction.RecordRow";
+
+const ListDoubleClickDoActionView = {
+    ...listView,
+    Renderer: ListDoubleClickDoAction,
+}
+
+registry.category("views").add('list_double_click_doaction', ListDoubleClickDoActionView);
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+    <t t-name="my.ListDoubleClickDoAction.RecordRow" t-inherit="web.ListRenderer.RecordRow" t-inherit-mode="primary" owl="1">
+        <xpath expr="//tr[hasclass('o_data_row')]//td[hasclass('o_data_cell')]" position="attributes">
+            <attribute name="t-on-dblclick">(ev) => this.onDoubleClicked(record, ev)</attribute>
+        </xpath>
+    </t>
+
+</templates>
+```
+
