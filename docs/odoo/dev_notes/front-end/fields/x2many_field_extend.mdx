@@ -1,0 +1,123 @@
+---
+title: X2ManyField扩展
+description: X2ManyField扩展
+sidebar_label: X2ManyField扩展
+keyword:
+  - odoo
+  - odoo development
+tags: [ odoo ]
+last_update:
+  date: 2025/11/10
+  author: Lucas
+---
+
+# X2ManyField扩展
+
+:::info[Note]
+
+对X2ManyField做一些改造，以实现更多的功能。
+
+--odoo version: 16
+
+:::
+
+## X2ManyField list export all data
+
+详情见[文档](/odoo/dev_notes/x2many_list_export_all.md)
+
+## 根据明细行数据控制明细行显示
+
+通过xpath在`ListRenderer.RecordRow`的`<tr>`标签添加属性`t-if`来控制是否显示该行数据。此处仅做简单展示，复杂需求另外做进一步设计。
+
+```javascript
+/** @odoo-module **/
+import { registry } from "@web/core/registry";
+import { ListRenderer } from "@web/views/list/list_renderer";
+import { X2ManyField } from "@web/views/fields/x2many/x2many_field";
+
+class TestRenderer extends ListRenderer{
+    setup(){
+        super.setup()
+        // ...
+    }
+
+    recordFilter(record){
+        return record.data.state !== 'canceled';
+    }
+}
+TestRenderer.recordRowTemplate = "test.RecordRow";
+
+class testRowFieldOne2Many extends X2ManyField {}
+testRowFieldOne2Many.recordRowTemplate = 'test.RecordRow';
+testRowFieldOne2Many.components = {
+    ...X2ManyField.components,
+    ListRenderer: TestRenderer,
+};
+
+registry.category("fields").add("test_list_view", testRowFieldOne2Many);
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates>
+  <t t-name="test.RecordRow" t-inherit="web.ListRenderer.RecordRow" t-inherit-mode="primary" owl="1">
+    <xpath expr="//tr" position="attributes">
+      <attribute name="t-if">recordFilter(record)</attribute>
+      <!-- <attribute name="t-on-click">() => this.recordFilter(record)</attribute> -->
+    </xpath>
+  </t>
+</templates>
+```
+
+## 修改明细行的点击事件
+
+**实现双击事件**
+
+通过xpath在`ListRenderer.RecordRow`的`<tr>`标签添加属性`t-on-dblclick`来实现明细行的双击事件。
+
+此处展示的是一个公共组件，支持在双击时请求后端，可自定义逻辑返回`action`进行跳转/打开界面。
+
+```javascript
+/** @odoo-module **/
+
+import { registry } from "@web/core/registry";
+import { X2ManyField } from "@web/views/fields/x2many/x2many_field";
+import { useService } from "@web/core/utils/hooks";
+import { ListRenderer } from "@web/views/list/list_renderer";
+
+class CustomDoubleClickListRender extends ListRenderer {
+  setup() {
+    super.setup();
+    this.actionService = useService("action");
+  }
+
+  async onRowDoubleClick(record, ev) {
+    const recordID = record.data.id;
+    const action = record.model.orm.call(record.resModel, "custom_double_click_action", [recordID]);
+    await this.actionService.doAction(action);
+  }
+}
+
+class CustomDoubleClickFieldOne2Many extends X2ManyField { }
+CustomDoubleClickListRender.recordRowTemplate = 'CustomDoubleClickListView.RecordRow';
+
+CustomDoubleClickFieldOne2Many.components = {
+  ...X2ManyField.components,
+  ListRenderer: CustomDoubleClickListRender,
+};
+
+registry.category("fields").add("custom_double_click", CustomDoubleClickFieldOne2Many);
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+
+<templates>
+  <t t-name="CustomDoubleClickListView.RecordRow" t-inherit="web.ListRenderer.RecordRow" t-inherit-mode="primary" owl="1">
+    <xpath expr="//tr" position="attributes">
+      <attribute name="t-on-dblclick">(ev) => this.onRowDoubleClick(record, ev)</attribute>
+    </xpath>
+  </t>
+
+</templates>
+```
