@@ -124,6 +124,7 @@ const sidebars = {
              label: 'Views',
              items: [
                 'odoo/dev_notes/front-end/views/form_view_usage',
+                'odoo/dev_notes/front-end/views/list_view_extension',
                 'odoo/dev_notes/front-end/views/x2many_treeview_unlink_button_position',
                 'odoo/dev_notes/front-end/views/listview_select_same_group_records',
                 'odoo/dev_notes/front-end/views/lazy_relation_model',
