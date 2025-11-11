@@ -48,10 +48,8 @@ const sidebars = {
           type: 'category',
           label: '视图',
           items: [
-            'odoo/dev_notes/views/form_view',
             'odoo/dev_notes/views/kanban_view',
             'odoo/dev_notes/views/search_view',
-            'odoo/dev_notes/views/graph_view_draw_data_labels',
             'odoo/dev_notes/views/view_and_xml_restrictions',
             'odoo/dev_notes/views/create_a_new_view_v17',
           ]
@@ -131,6 +129,7 @@ const sidebars = {
                 'odoo/dev_notes/front-end/views/form_view_do_not_auto_save',
                 'odoo/dev_notes/front-end/views/disable_for_view_useEffect_v16',
                 'odoo/dev_notes/front-end/views/form_view_record_readonly_domain_thinking_v16',
+                'odoo/dev_notes/front-end/views/graph_view_extension',
              ]
            },
            {
