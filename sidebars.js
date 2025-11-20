@@ -139,6 +139,7 @@ const sidebars = {
                 'odoo/dev_notes/front-end/fields/integer_field_extend',
                 'odoo/dev_notes/front-end/fields/float_field_extend',
                 'odoo/dev_notes/front-end/fields/x2many_field_extend',
+                'odoo/dev_notes/front-end/fields/binary_field_extension',
              ]
            },
           ]
