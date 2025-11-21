@@ -146,7 +146,7 @@ const sidebars = {
         },
         {
           type: 'category',
-          label: 'Custom Module',
+          label: 'Custom Module/Component',
           items: [
             'odoo/dev_notes/simplest_systray',
             'odoo/dev_notes/systray_quick_menu',
