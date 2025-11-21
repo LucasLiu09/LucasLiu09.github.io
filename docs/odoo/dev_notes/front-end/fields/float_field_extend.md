@@ -18,6 +18,7 @@ last_update:
 
   1. `FloatFieldFormat`: 格式化数据显示及必填检查
   2. `FloatFieldFormatX`: 自定义整数数据的小数位数(即显示0的位数)（对于小数部分非0的时候，沿用digits处理，当小数部分为0的时候，可以单独设置保留位数。）
+  3. `parse_float`: 移除小数部分尾部多余的0
 
 :::
 
@@ -200,4 +201,36 @@ FloatFieldFormatX.extractProps = ({ attrs, field }) => {
 };
 
 registry.category("fields").add('float_format_x', FloatFieldFormatX);
+```
+
+
+## parse_float 移除小数部分尾部多余的0
+
+:::info[Note]
+parse_float: 通过修改FloatField输出显示内容的函数`formattedValue`，来实现移除小数部分尾部多余的0.
+:::
+
+```javascript title="parse_float.js"
+/** @odoo-module **/
+
+import { FloatField } from "@web/views/fields/float/float_field";
+import { registry } from "@web/core/registry";
+import { parseFloat } from "@web/views/fields/parsers";
+import { formatFloat } from "@web/views/fields/formatters";
+
+export class parseFloatField extends FloatField {
+    get formattedValue(){
+        const data = super.formattedValue;
+        try {
+            const dataStr = parseFloat(data).toString();
+            const parts = dataStr.split('.');
+            const parts_length = parts[1] ? parts[1].length : 0;
+            return formatFloat(Number(dataStr), { digits: [null, parts_length] });
+        }catch (e) {
+            return data;
+        }
+    }
+}
+
+registry.category("fields").add("parse_float", parseFloatField);
 ```
