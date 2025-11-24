@@ -161,7 +161,14 @@ const sidebars = {
         'odoo/dev_notes/common/add_table_change_log',
         'odoo/dev_notes/python_code_snippet',
         'others/python_patterns',
-        'others/git_commit_message',
+        {
+          type: 'category',
+          label: 'Git',
+          items: [
+            'others/git_commit_message',
+          ]
+         },
+        
       ]
     }
   ],
