@@ -166,6 +166,7 @@ const sidebars = {
           label: 'Git',
           items: [
             'others/git_commit_message',
+            'others/git_commands',
           ]
          },
         
