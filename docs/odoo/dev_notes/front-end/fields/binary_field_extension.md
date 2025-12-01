@@ -25,6 +25,7 @@ last_update:
 :::info[Note]
 实现Binary字段能够拖拽文件进行上传。
 > [Github-New Component](https://github.com/LucasLiu09/odoo-module-lucas/tree/16.0/files_drop_upload)
+> 
 > [Github-Patch BinaryField](https://github.com/LucasLiu09/odoo-module-lucas/tree/16.0/Non_module/binary_field_drop_files)
 :::
 
