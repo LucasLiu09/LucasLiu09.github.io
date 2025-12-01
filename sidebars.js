@@ -144,7 +144,14 @@ const sidebars = {
                 'odoo/dev_notes/front-end/fields/m2m_binary_field_extension',
                 'odoo/dev_notes/front-end/fields/boolean_field_extension',
              ]
-           },
+            },
+            {
+             type: 'category',
+             label: 'Widget',
+             items: [
+                'odoo/dev_notes/front-end/widget/toggle_record',
+             ]
+            },
           ]
         },
         {
