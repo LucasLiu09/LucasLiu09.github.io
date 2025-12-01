@@ -23,6 +23,8 @@ last_update:
 ## 支持下拉选择
 
 > [Github-char_and_selection](https://github.com/LucasLiu09/odoo-module-lucas/tree/16.0/Non_module/char_and_selection)
+>
+> [Github-char_and_selection_v2](https://github.com/LucasLiu09/odoo-module-lucas/tree/16.0/Non_module/char_and_selection_v2)
 
 支持Char Field使用下拉选项，支持搜索
 
