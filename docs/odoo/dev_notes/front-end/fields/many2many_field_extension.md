@@ -34,7 +34,7 @@ last_update:
 
 ![image1](../../_images/many2one_quick_query1.png)
 
-![image2](assets/_images/many2one_quick_query2.png)
+![image2](../../_images/many2one_quick_query2.png)
 
 ### 快速开始
 
