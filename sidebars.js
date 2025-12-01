@@ -141,6 +141,7 @@ const sidebars = {
                 'odoo/dev_notes/front-end/fields/char_field_extension',
                 'odoo/dev_notes/front-end/fields/x2many_field_extend',
                 'odoo/dev_notes/front-end/fields/binary_field_extension',
+                'odoo/dev_notes/front-end/fields/m2m_binary_field_extension',
                 'odoo/dev_notes/front-end/fields/boolean_field_extension',
              ]
            },
