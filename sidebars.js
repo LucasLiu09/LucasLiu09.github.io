@@ -153,6 +153,15 @@ const sidebars = {
                 'odoo/dev_notes/front-end/widget/toggle_record',
              ]
             },
+             {
+             type: 'category',
+             label: 'Service',
+             items: [
+                'odoo/dev_notes/front-end/service/odoo_services',
+                'odoo/dev_notes/front-end/service/create_new_service',
+                'odoo/dev_notes/front-end/service/create_simple_mail_service',
+              ]
+             },
           ]
         },
         {
