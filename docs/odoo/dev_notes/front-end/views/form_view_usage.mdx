@@ -527,9 +527,14 @@ registry.category("views").add("form_breadcrumbs_mini", formViewBreadcrumbsMini)
 
 ## FormView刷新页面不自动保存
 
+:::info[Note]
+在Form视图中，离开页面或页面刷新时，不自动保存单据。
 - version: odoo16
+:::
 
-在odoo16较新的版本中，是通过`useSetupView`来处理页面离开的操作，所以我们只需要重写`beforeLeave`、`beforeUnload`函数，将内部关于存储的逻辑取消或进行有条件的处理。
+在Odoo16中，由于小版本的差异需要差异化处理，需查看`addons/web/static/src/views/form/form_controller.js`文件。
+
+在odoo16中，是通过`useSetupView`来处理页面离开的操作，所以我们只需要重写`beforeLeave`、`beforeUnload`函数，将内部关于存储的逻辑取消或进行有条件的处理。
 
 ```javascript
 useSetupView({
@@ -546,7 +551,7 @@ useSetupView({
 });
 ```
 
-对于稍旧的版本，需要额外做一些处理，在`onRendered`中做以下处理。
+对于稍旧的版本，需要额外做一些处理，在`onRendered`中调用`this.env.__beforeLeave__.remove(this)`。
 
 ```javascript
 onRendered(()=>{
@@ -559,3 +564,4 @@ onRendered(()=>{
 ## FormView的保存/丢弃
 
 FormView的保存/丢弃按钮是`FormStatusIndicator`组件，如果要修改或者替换该组件，就需要在`FormController`或`FormStatusIndicator`进行修改或替换。
+
