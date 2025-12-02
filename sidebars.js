@@ -175,6 +175,13 @@ const sidebars = {
             'odoo/dev_notes/custom_module/custom_popover_widget',
           ]
         },
+        {
+          type: 'category',
+          label: '一些经验',
+          items: [
+            'odoo/dev_notes/experiences/picture_quality_issues',
+          ]
+         },
         'odoo/dev_notes/translate',
         'odoo/dev_notes/code_quick_reference_table',
         'odoo/dev_notes/common/odoo_locust_stress_test',
