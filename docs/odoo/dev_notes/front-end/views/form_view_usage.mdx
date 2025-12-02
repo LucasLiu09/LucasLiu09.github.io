@@ -524,3 +524,38 @@ export const formViewBreadcrumbsMini = {
 
 registry.category("views").add("form_breadcrumbs_mini", formViewBreadcrumbsMini);
 ```
+
+## FormView刷新页面不自动保存
+
+- version: odoo16
+
+在odoo16较新的版本中，是通过`useSetupView`来处理页面离开的操作，所以我们只需要重写`beforeLeave`、`beforeUnload`函数，将内部关于存储的逻辑取消或进行有条件的处理。
+
+```javascript
+useSetupView({
+	rootRef,
+	beforeLeave: () => this.beforeLeave(),
+	beforeUnload: (ev) => this.beforeUnload(ev),
+	getLocalState: () => {
+		// TODO: export the whole model?
+		return {
+			activeNotebookPages: !this.model.root.isNew && activeNotebookPages,
+			resId: this.model.root.resId,
+		};
+	},
+});
+```
+
+对于稍旧的版本，需要额外做一些处理，在`onRendered`中做以下处理。
+
+```javascript
+onRendered(()=>{
+	if (this.env.__beforeLeave__){
+		this.env.__beforeLeave__.remove(this)   // 离开页面不保存, 避免直接跳过额外处理的逻辑。
+	}
+})
+```
+
+## FormView的保存/丢弃
+
+FormView的保存/丢弃按钮是`FormStatusIndicator`组件，如果要修改或者替换该组件，就需要在`FormController`或`FormStatusIndicator`进行修改或替换。
