@@ -25,15 +25,27 @@ last_update:
 
 ## 用法
 
+Usage1:
+
 ```xml
-<widget name="custom_popover_widget" attrs="{}" icon="fa-search" text="查看库存" tooltip="some tips" autoSave="True" />
+<widget name="custom_popover_widget" icon="fa-search" text="查看库存" autoSave="True" attrs="{'invisible': [('id', '=', False)]}"/>
 ```
 
-参数说明：
-- icon设置图标
-- text：设置图标后的文本
-- tooltip：提示信息(设置这个属性视为固定提示语，就不会请求后端获取。)
-- autoSave：在请求后端前是否保存。
+Usage2:
+
+```xml
+<widget name="custom_popover_widget" icon="fa-lightbulb-o" tooltip="这是tips" text="Popover"/>
+```
+
+
+## 参数说明
+
+- icon: fa图标的class名称。(来源Font Awesome)
+- text: icon后面显示的文本。
+- tooltip: 弹出的气泡内的文本。(如果设置了tooltip就不会请求后端获取toolip信息)
+- autoSave(default: False): 设置为True时会先调用Record.save()，如果save()返回的结果为True，才会进一步请求后端莫得行的get_tooltip()；如果autoSave=False则直接请求后端获取tooltip信息。
+- options: 传递给后端get_tooltip()的参数。
+- attrs: 与普通Field的attrs相同。
 
 要从后端获取信息时在调用该`widget`的`Model`定义`get_tooltip()`，通过后端返回信息。
 
