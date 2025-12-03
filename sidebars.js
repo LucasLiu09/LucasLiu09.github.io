@@ -173,6 +173,7 @@ const sidebars = {
             'odoo/dev_notes/x2many_list_export_all',
             'odoo/dev_notes/custom_module/ir_actions_report_docx',
             'odoo/dev_notes/custom_module/custom_popover_widget',
+            'odoo/dev_notes/custom_module/file_preview_by_kkfile',
           ]
         },
         {
