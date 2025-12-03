@@ -181,6 +181,7 @@ const sidebars = {
           label: '一些经验',
           items: [
             'odoo/dev_notes/experiences/picture_quality_issues',
+            'odoo/dev_notes/experiences/reset_password_issues',
           ]
          },
         'odoo/dev_notes/translate',
