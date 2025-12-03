@@ -162,6 +162,13 @@ const sidebars = {
                 'odoo/dev_notes/front-end/service/create_simple_mail_service',
               ]
              },
+             {
+             type: 'category',
+             label: 'Other',
+             items: [
+                'odoo/dev_notes/front-end/some_frontend_usage',
+              ]
+              },
           ]
         },
         {
