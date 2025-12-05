@@ -1322,7 +1322,104 @@ sorted_dict = dict(sorted(d.items(), key=lambda x: natural_sort_key(x[0])))
 
 ---
 
+## 简单二维矩阵
 
+```python title="SimpleMatrix.py"
+from collections import defaultdict
 
+class SimpleMatrix:
+    """
+    简洁高效的二维索引数据结构
+    平衡了易用性和性能
+    """
 
+    def __init__(self):
+        # 核心数据结构
+        self.data = {}  # (row_key, col_key) -> value
+        self.rows = defaultdict(dict)  # row_key -> {col_key: value}
+        self.cols = defaultdict(dict)  # col_key -> {row_key: value}
+        self.row_keys = []  # 维护插入顺序
+        self.col_keys = []
+        self._row_set = set()
+        self._col_set = set()
+
+    def set(self, row_key, col_key, value):
+        """设置数据"""
+        # 更新索引
+        if row_key not in self._row_set:
+            self.row_keys.append(row_key)
+            self._row_set.add(row_key)
+        if col_key not in self._col_set:
+            self.col_keys.append(col_key)
+            self._col_set.add(col_key)
+
+        # 存储数据到三个地方
+        self.data[(row_key, col_key)] = value
+        self.rows[row_key][col_key] = value
+        self.cols[col_key][row_key] = value
+
+    def get(self, row_key=None, col_key=None, default=None):
+        """
+        灵活的获取接口
+        - get(row, col): 获取单个值
+        - get(row=row): 获取整行
+        - get(col=col): 获取整列
+        """
+        if row_key is not None and col_key is not None:
+            # 获取单个值
+            return self.data.get((row_key, col_key), default)
+        elif row_key is not None:
+            # 获取整行
+            return dict(self.rows[row_key])
+        elif col_key is not None:
+            # 获取整列
+            return dict(self.cols[col_key])
+        else:
+            # 返回所有数据
+            return dict(self.data)
+
+    def get_row(self, row_key):
+        """获取行数据"""
+        return dict(self.rows[row_key])
+
+    def get_col(self, col_key):
+        """获取列数据"""
+        return dict(self.cols[col_key])
+
+    def delete(self, row_key=None, col_key=None):
+        """删除数据"""
+        if row_key is not None and col_key is not None:
+            # 删除单个单元格
+            if (row_key, col_key) in self.data:
+                del self.data[(row_key, col_key)]
+                del self.rows[row_key][col_key]
+                del self.cols[col_key][row_key]
+        elif row_key is not None:
+            # 删除整行
+            for col_key in list(self.rows[row_key].keys()):
+                self.delete(row_key, col_key)
+            if row_key in self._row_set:
+                self.row_keys.remove(row_key)
+                self._row_set.remove(row_key)
+        elif col_key is not None:
+            # 删除整列
+            for row_key in list(self.cols[col_key].keys()):
+                self.delete(row_key, col_key)
+            if col_key in self._col_set:
+                self.col_keys.remove(col_key)
+                self._col_set.remove(col_key)
+
+    def to_list(self):
+        """转换为二维列表"""
+        result = []
+        for row_key in self.row_keys:
+            row = []
+            for col_key in self.col_keys:
+                row.append(self.data.get((row_key, col_key), None))
+            result.append(row)
+        return result
+
+    def __repr__(self):
+        return f"SimpleMatrix(rows={len(self.row_keys)}, cols={len(self.col_keys)}, cells={len(self.data)})"
+```
 
