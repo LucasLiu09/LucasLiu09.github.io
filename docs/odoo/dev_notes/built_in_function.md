@@ -43,7 +43,7 @@ tags: [odoo]
   ```python
     @api.model
     def get_view(self, view_id=None, view_type="form", **options):
-      if view_type == 'form_view' and self.env.context.get('custom_context'):
+      if view_type == 'form' and self.env.context.get('custom_context'):
         view_id = self.env.ref("xml_id").id
       result = super(thisModel, self).get_view(view_id=view_id, view_type=view_type, **options)
       return result
