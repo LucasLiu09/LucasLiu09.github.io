@@ -38,7 +38,18 @@ tags: [odoo]
 
 :::
 
-- 通过template渲染添加的内容
+### 通过context等动态调整view_id
+
+  ```python
+    @api.model
+    def get_view(self, view_id=None, view_type="form", **options):
+      if view_type == 'form_view' and self.env.context.get('custom_context'):
+        view_id = self.env.ref("xml_id").id
+      result = super(thisModel, self).get_view(view_id=view_id, view_type=view_type, **options)
+      return result
+  ```
+
+### 通过template渲染添加的内容
   
   ```html
   <?xml version="1.0" encoding="UTF-8" ?>
@@ -54,47 +65,48 @@ tags: [odoo]
   </odoo>
   ```
   
-  ```
+
+  ```python
+  class XXX():
+  	def _add_content(self, params=None):
+  		if params is None:
+  			params = {}
+  		str_element = self.env["ir.qweb"]._render(
+  			"template_id", params
+  		)
+  		new_node = etree.fromstring(str_element)
+  		return new_node
+  	
+  	@api.model
+  	def get_view(self, view_id=None, view_type="form", **options):
+  		res = super(xx, self).get_view(view_id=view_id, view_type=view_type, **options)
+  		View = self.env["ir.ui.view"]
+  		if view_type == 'form':
+  			doc = etree.XML(res["arch"])
+  			all_models = res["models"].copy()
+  			for node in doc.xpath("//div[@name='xxxx']"):
+  				if self.env.context.get('context1'):
+  					new_node = self._add_content()
+  					new_arch, new_models = View.postprocess_and_fields(new_node, self._name)
+  					new_node = etree.fromstring(new_arch)
+  					# etree处理节点
+  					node.append(new_node)
+  					_merge_view_fields(all_models, new_models)
+  			res["arch"] = etree.tostring(doc)
+  			res["models"] = frozendict(all_models)
+  		return res
   
+  
+  def _merge_view_fields(all_models: dict, new_models: dict):
+      """Merge new_models into all_models. Both are {modelname(str) ➔ fields(tuple)}."""
+      for model, view_fields in new_models.items():
+          if model in all_models:
+              all_models[model] = tuple(set(all_models[model]) | set(view_fields))
+          else:
+              all_models[model] = tuple(view_fields)
   ```
 
-```python
-class XXX():
-
-    @api.model
-    def get_view(self, view_id=None, view_type="form", **options):
-        res = super(CbSoDtSearchWizard, self).get_view(view_id=view_id, view_type=view_type, **options)
-        View = self.env["ir.ui.view"]
-        if view_type == 'form':
-            doc = etree.XML(res["arch"])
-            all_models = res["models"].copy()
-            div = doc.xpath("//div[@name='xxx']")
-            if len(div):
-                if self.env.context.get('context1'):
-                    # 此处添加attrib时注意不能用Boolean类型
-                    etree.SubElement(div[0], 'field',
-                                     {'name': 'field_name', 'readonly': 'true',
-                                      'context': "{}"})
-                # 此处postprocess_and_fields只能对新增的节点处理，否则会影响原xml其他节点设置的属性。
-                new_node = doc.xpath("//field[@name='field_name']")
-                if len(new_node):
-                    new_arch, new_models = View.postprocess_and_fields(new_node[0], self._name)
-                    _merge_view_fields(all_models, new_models)
-            res["arch"] = etree.tostring(new_arch)
-            res["models"] = frozendict(all_models)
-        return res
-
-
-def _merge_view_fields(all_models: dict, new_models: dict):
-    """Merge new_models into all_models. Both are {modelname(str) ➔ fields(tuple)}."""
-    for model, view_fields in new_models.items():
-        if model in all_models:
-            all_models[model] = tuple(set(all_models[model]) | set(view_fields))
-        else:
-            all_models[model] = tuple(view_fields)
-```
-
-- 直接插入内容
+### 直接插入内容
 
 ```python
 class XXX():
