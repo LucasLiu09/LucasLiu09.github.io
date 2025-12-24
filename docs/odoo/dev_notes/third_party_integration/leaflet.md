@@ -24,11 +24,11 @@ Leaflet 是一个开源并且对移动端友好的交互式地图 JavaScript 库
 
 ## 特性
 
-![特性[(../_images/leaflet_1.png)
+![特性](../_images/leaflet_1.png)
 
 ## 示例截图
               
-![示例截图[(../_images/leaflet_2.png)
+![示例截图](../_images/leaflet_2.png)
                
 ## 基础使用
 
