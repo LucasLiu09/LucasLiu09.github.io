@@ -185,6 +185,13 @@ const sidebars = {
         },
         {
           type: 'category',
+          label: '第三方集成',
+          items: [
+            'odoo/dev_notes/third_party_integration/leaflet',
+          ]
+         },
+        {
+          type: 'category',
           label: '一些经验',
           items: [
             'odoo/dev_notes/experiences/picture_quality_issues',
