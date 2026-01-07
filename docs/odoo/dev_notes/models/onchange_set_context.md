@@ -33,8 +33,10 @@ odoo原生代码在onchange上有一些用法：
 def onchange(self, values, field_name, field_onchange):
     # 判断字段是否在变更的字段列表中
     if 'your_field' in field_name:
+
         # 更新self并设置context
         self = self.with_context(update_skip_onchange=True)
+        # 此处设置context之后，便可以在其他字段的onchange函数中使用这个上下文。
 
         # 如果想要在变更"your_field"的时候不更新"your_field_x"，则在field_onchange中将其删除。
         if 'your_field' in field_onchange:
