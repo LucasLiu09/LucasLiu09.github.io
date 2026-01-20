@@ -86,7 +86,7 @@ last_update:
 
 ## 7. X2ManyField 与 ListRenderer 的详细上下层传递关系
 
-在 Odoo 16 的设计中，`X2ManyField` 是**控制器（Controller）**角色，而 `ListRenderer` 是**展示器（Presenter）**角色。两者之间存在严密的双向交互。
+在 Odoo 16 的设计中，`X2ManyField` 是 **控制器（Controller）** 角色，而 `ListRenderer` 是 **展示器（Presenter）** 角色。两者之间存在严密的双向交互。
 
 ### 7.1 下层传递 (Top-Down: Data & Config)
 
