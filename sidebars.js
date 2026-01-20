@@ -99,7 +99,8 @@ const sidebars = {
             'odoo/dev_notes/owl_dropdown',
             'odoo/dev_notes/owl_useSortable',            
             'odoo/dev_notes/command_palette',
-            'odoo/dev_notes/file_viewer_v17',            
+            'odoo/dev_notes/file_viewer_v17', 
+            'odoo/dev_notes/source_code_analysis/common/x2many_field_analysis',
           ]
         },
         {
