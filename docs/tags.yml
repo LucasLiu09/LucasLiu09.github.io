@@ -12,5 +12,5 @@ git:
 AI:
   label: 'AI'
 
-GENAI:
+GenAI:
   label: 'Generative AI'
