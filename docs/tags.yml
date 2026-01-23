@@ -8,3 +8,9 @@ projectManager:
 
 git:
   label: 'Git'
+
+AI:
+  label: 'AI'
+
+GENAI:
+  label: 'Generative AI'
