@@ -1,3 +1,13 @@
+---
+title: Odoo OWL选择类字段组件Prompt模板
+sidebar_label: Odoo OWL选择类字段组件Prompt模板
+keywords:
+  - AI
+  - GenAI
+tags: [GenAI]
+unlisted: true
+---
+
 # Odoo OWL 选择类字段组件 Prompt 模板
 
 > **适用类型**: Selection, Radio, Badge Selection, State Selection  
