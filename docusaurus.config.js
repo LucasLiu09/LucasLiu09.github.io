@@ -109,6 +109,12 @@ const config = {
             label: '项目管理',
           },
           {
+            type: 'docSidebar',
+            sidebarId: 'generativeAISidebar',
+            position: 'right',
+            label: 'Generative AI',
+          },
+          {
             href: 'https://github.com/LucasLiu09/LucasLiu09.github.io',
             label: 'GitHub',
             position: 'right',
