@@ -34,12 +34,12 @@ tags: [GenAI]
 
 | 编号 | Prompt名称 | 适用字段类型 | 复杂度 | 文件名 |
 |------|-----------|------------|--------|--------|
-| 1.1 | 基础字段组件 | Integer, Float, Char, Text, Date, Datetime, Boolean | ⭐⭐ | [_Prompt_Field_Basic.md](./_Prompt_Field_Basic) |
-| 1.2 | 关系型字段组件 | Many2one, One2many, Many2many | ⭐⭐⭐⭐⭐ | [_Prompt_Field_Relational.md](./_Prompt_Field_Relational) |
-| 1.3 | 选择类字段组件 | Selection, Radio, Badge, State Selection | ⭐⭐⭐ | [_Prompt_Field_Selection.md](./_Prompt_Field_Selection) |
-| 1.4 | 二进制字段组件 | Binary, Image, File, Many2many Binary | ⭐⭐⭐⭐ | [_Prompt_Field_Binary.md](./_Prompt_Field_Binary) |
-| 1.5 | 富媒体字段组件 | Html, Signature, PDF Viewer, Ace Editor | ⭐⭐⭐⭐ | [_Prompt_Field_RichMedia.md](./_Prompt_Field_RichMedia) |
-| 1.6 | 特殊字段组件 | Monetary, Progress Bar, Priority, Handle, Domain | ⭐⭐⭐⭐ | [_Prompt_Field_Special.md](./_Prompt_Field_Special) |
+| 1.1 | 基础字段组件 | Integer, Float, Char, Text, Date, Datetime, Boolean | ⭐⭐ | [Prompt_Field_Basic.md](./Prompt_Field_Basic) |
+| 1.2 | 关系型字段组件 | Many2one, One2many, Many2many | ⭐⭐⭐⭐⭐ | [Prompt_Field_Relational.md](./Prompt_Field_Relational) |
+| 1.3 | 选择类字段组件 | Selection, Radio, Badge, State Selection | ⭐⭐⭐ | [Prompt_Field_Selection.md](./Prompt_Field_Selection) |
+| 1.4 | 二进制字段组件 | Binary, Image, File, Many2many Binary | ⭐⭐⭐⭐ | [Prompt_Field_Binary.md](./Prompt_Field_Binary) |
+| 1.5 | 富媒体字段组件 | Html, Signature, PDF Viewer, Ace Editor | ⭐⭐⭐⭐ | [Prompt_Field_RichMedia.md](./Prompt_Field_RichMedia) |
+| 1.6 | 特殊字段组件 | Monetary, Progress Bar, Priority, Handle, Domain | ⭐⭐⭐⭐ | [Prompt_Field_Special.md](./Prompt_Field_Special) |
 
 ---
 
@@ -47,7 +47,7 @@ tags: [GenAI]
 
 ### 1.1 基础字段组件 ⭐⭐
 
-**文件**: [_Prompt_Field_Basic.md](./_Prompt_Field_Basic)
+**文件**: [Prompt_Field_Basic.md](./Prompt_Field_Basic)
 
 **适用场景**：
 - 数字输入（整数、浮点数）
@@ -86,7 +86,7 @@ tags: [GenAI]
 
 ### 1.2 关系型字段组件 ⭐⭐⭐⭐⭐
 
-**文件**: [_Prompt_Field_Relational.md](./_Prompt_Field_Relational)
+**文件**: [Prompt_Field_Relational.md](./Prompt_Field_Relational)
 
 **适用场景**：
 - 多对一关联（选择单个记录）
@@ -120,7 +120,7 @@ tags: [GenAI]
 
 ### 1.3 选择类字段组件 ⭐⭐⭐
 
-**文件**: [_Prompt_Field_Selection.md](./_Prompt_Field_Selection)
+**文件**: [Prompt_Field_Selection.md](./Prompt_Field_Selection)
 
 **适用场景**：
 - 固定选项的单选
@@ -155,7 +155,7 @@ tags: [GenAI]
 
 ### 1.4 二进制字段组件 ⭐⭐⭐⭐
 
-**文件**: [_Prompt_Field_Binary.md](./_Prompt_Field_Binary)
+**文件**: [Prompt_Field_Binary.md](./Prompt_Field_Binary)
 
 **适用场景**：
 - 文件上传和下载
@@ -190,7 +190,7 @@ tags: [GenAI]
 
 ### 1.5 富媒体字段组件 ⭐⭐⭐⭐
 
-**文件**: [_Prompt_Field_RichMedia.md](./_Prompt_Field_RichMedia)
+**文件**: [Prompt_Field_RichMedia.md](./Prompt_Field_RichMedia)
 
 **适用场景**：
 - 富文本编辑
@@ -228,7 +228,7 @@ tags: [GenAI]
 
 ### 1.6 特殊字段组件 ⭐⭐⭐⭐
 
-**文件**: [_Prompt_Field_Special.md](./_Prompt_Field_Special)
+**文件**: [Prompt_Field_Special.md](./Prompt_Field_Special)
 
 **适用场景**：
 - 货币金额显示
@@ -270,38 +270,38 @@ tags: [GenAI]
 ## 🔍 字段类型快速查找
 
 ### 数字类型
-- **Integer** → 使用 [1.1 基础字段](./_Prompt_Field_Basic)
-- **Float** → 使用 [1.1 基础字段](./_Prompt_Field_Basic)
-- **Monetary** → 使用 [1.6 特殊字段](./_Prompt_Field_Special)
+- **Integer** → 使用 [1.1 基础字段](./Prompt_Field_Basic)
+- **Float** → 使用 [1.1 基础字段](./Prompt_Field_Basic)
+- **Monetary** → 使用 [1.6 特殊字段](./Prompt_Field_Special)
 
 ### 文本类型
-- **Char** → 使用 [1.1 基础字段](./_Prompt_Field_Basic)
-- **Text** → 使用 [1.1 基础字段](./_Prompt_Field_Basic)
-- **Html** → 使用 [1.5 富媒体字段](./_Prompt_Field_RichMedia)
+- **Char** → 使用 [1.1 基础字段](./Prompt_Field_Basic)
+- **Text** → 使用 [1.1 基础字段](./Prompt_Field_Basic)
+- **Html** → 使用 [1.5 富媒体字段](./Prompt_Field_RichMedia)
 
 ### 日期时间
-- **Date** → 使用 [1.1 基础字段](./_Prompt_Field_Basic)
-- **Datetime** → 使用 [1.1 基础字段](./_Prompt_Field_Basic)
+- **Date** → 使用 [1.1 基础字段](./Prompt_Field_Basic)
+- **Datetime** → 使用 [1.1 基础字段](./Prompt_Field_Basic)
 
 ### 布尔和选择
-- **Boolean** → 使用 [1.1 基础字段](./_Prompt_Field_Basic)
-- **Selection** → 使用 [1.3 选择类字段](./_Prompt_Field_Selection)
+- **Boolean** → 使用 [1.1 基础字段](./Prompt_Field_Basic)
+- **Selection** → 使用 [1.3 选择类字段](./Prompt_Field_Selection)
 
 ### 关系型
-- **Many2one** → 使用 [1.2 关系型字段](./_Prompt_Field_Relational)
-- **One2many** → 使用 [1.2 关系型字段](./_Prompt_Field_Relational)
-- **Many2many** → 使用 [1.2 关系型字段](./_Prompt_Field_Relational)
+- **Many2one** → 使用 [1.2 关系型字段](./Prompt_Field_Relational)
+- **One2many** → 使用 [1.2 关系型字段](./Prompt_Field_Relational)
+- **Many2many** → 使用 [1.2 关系型字段](./Prompt_Field_Relational)
 
 ### 二进制
-- **Binary** → 使用 [1.4 二进制字段](./_Prompt_Field_Binary)
-- **Image** → 使用 [1.4 二进制字段](./_Prompt_Field_Binary)
+- **Binary** → 使用 [1.4 二进制字段](./Prompt_Field_Binary)
+- **Image** → 使用 [1.4 二进制字段](./Prompt_Field_Binary)
 
 ### 特殊类型
-- **进度条** → 使用 [1.6 特殊字段](./_Prompt_Field_Special)
-- **优先级** → 使用 [1.6 特殊字段](./_Prompt_Field_Special)
-- **签名** → 使用 [1.5 富媒体字段](./_Prompt_Field_RichMedia)
-- **代码编辑器** → 使用 [1.5 富媒体字段](./_Prompt_Field_RichMedia)
-- **域构建器** → 使用 [1.6 特殊字段](./_Prompt_Field_Special)
+- **进度条** → 使用 [1.6 特殊字段](./Prompt_Field_Special)
+- **优先级** → 使用 [1.6 特殊字段](./Prompt_Field_Special)
+- **签名** → 使用 [1.5 富媒体字段](./Prompt_Field_RichMedia)
+- **代码编辑器** → 使用 [1.5 富媒体字段](./Prompt_Field_RichMedia)
+- **域构建器** → 使用 [1.6 特殊字段](./Prompt_Field_Special)
 
 ---
 
