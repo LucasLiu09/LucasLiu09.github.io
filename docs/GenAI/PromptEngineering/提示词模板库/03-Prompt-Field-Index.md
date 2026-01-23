@@ -1,7 +1,7 @@
 ---
-title: Odoo OWL字段组件Prompt索引
+title: 03-Odoo OWL字段组件Prompt索引
 sidebar_position: 103
-sidebar_label: Odoo OWL字段组件Prompt索引
+sidebar_label: 03-Odoo OWL字段组件Prompt索引
 keywords:
   - AI
   - GenAI
