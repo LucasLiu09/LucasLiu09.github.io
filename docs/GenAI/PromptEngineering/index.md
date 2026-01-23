@@ -1,7 +1,7 @@
 ---
-title: Prompt Engineering
+title: 提示词工程
 sidebar_position: 100
-sidebar_label: Prompt Engineering
+sidebar_label: 提示词工程
 keywords:
   - AI
   - GenAI
