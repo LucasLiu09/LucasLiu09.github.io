@@ -1,3 +1,13 @@
+---
+title: Odoo OWL关系型字段组件Prompt模板
+sidebar_label: Odoo OWL关系型字段组件Prompt模板
+keywords:
+  - AI
+  - GenAI
+tags: [GenAI]
+unlisted: true
+---
+
 # Odoo OWL 关系型字段组件 Prompt 模板
 
 > **适用类型**: Many2one, One2many, Many2many  
