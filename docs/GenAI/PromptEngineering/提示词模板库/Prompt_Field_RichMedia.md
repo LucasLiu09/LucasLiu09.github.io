@@ -1,3 +1,13 @@
+---
+title: Odoo OWL富媒体字段组件Prompt模板
+sidebar_label: Odoo OWL富媒体字段组件Prompt模板
+keywords:
+  - AI
+  - GenAI
+tags: [GenAI]
+unlisted: true
+---
+
 # Odoo OWL 富媒体字段组件 Prompt 模板
 
 > **适用类型**: Html, Signature, PDF Viewer, Ace Editor  
