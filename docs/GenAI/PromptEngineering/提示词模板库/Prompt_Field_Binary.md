@@ -1,3 +1,13 @@
+---
+title: Odoo OWL二进制字段组件Prompt模板
+sidebar_label: Odoo OWL二进制字段组件Prompt模板
+keywords:
+  - AI
+  - GenAI
+tags: [GenAI]
+unlisted: true
+---
+
 # Odoo OWL 二进制字段组件 Prompt 模板
 
 > **适用类型**: Binary, Image, File, Many2many Binary  
