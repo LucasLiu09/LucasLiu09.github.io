@@ -156,21 +156,21 @@ tags: [GenAI, Prompt]
 【详细描述接口的输入输出和业务逻辑】
 
 ### 请求参数
-```json
+
 {
   "param1": "类型和说明",
   "param2": "类型和说明"
 }
-```
+
 
 ### 返回格式
-```json
+
 {
   "status": "success/error",
   "data": {},
   "message": ""
 }
-```
+
 
 ### 错误处理
 - 【描述需要处理的异常情况】
@@ -250,7 +250,7 @@ tags: [GenAI, Prompt]
 【用流程图或步骤描述业务逻辑】
 
 请生成完整的模块结构：
-```
+
 custom_module/
 ├── __init__.py
 ├── __manifest__.py
@@ -283,7 +283,7 @@ custom_module/
 ├── i18n/
 │   └── zh_CN.po
 └── README.md
-```
+
 ```
 
 ---
