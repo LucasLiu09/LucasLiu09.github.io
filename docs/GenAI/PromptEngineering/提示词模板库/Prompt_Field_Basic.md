@@ -1,3 +1,13 @@
+---
+title: Odoo OWL基础字段组件Prompt模板
+sidebar_label: Odoo OWL基础字段组件Prompt模板
+keywords:
+  - AI
+  - GenAI
+tags: [GenAI]
+unlisted: true
+---
+
 # Odoo OWL 基础字段组件 Prompt 模板
 
 > **适用类型**: Integer, Float, Char, Text, Date, Datetime, Boolean  
