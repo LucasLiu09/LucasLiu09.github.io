@@ -287,19 +287,21 @@ registry.category("fields").add("your_field", YourField);
 - 主题适配
 
 #### 4. 资源注册文件
-**路径**: `views/assets.xml`
+仅在生成模块的情况下才需要输出此项。
+
+**路径**: `__manifest__.py`
 
 **内容**:
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <template id="assets_backend" inherit_id="web.assets_backend">
-        <xpath expr="." position="inside">
-            <script type="text/javascript" src="/【模块名】/static/src/fields/【技术名称】/【技术名称】.js"/>
-            <link rel="stylesheet" type="text/scss" href="/【模块名】/static/src/fields/【技术名称】/【技术名称】.scss"/>
-        </xpath>
-    </template>
-</odoo>
+```python
+{
+  "assets": {
+    "web.assets_backend": [
+      "module_name/static/src/js/*.js",
+      "module_name/static/src/xml/*.xml",
+      "module_name/static/src/scss/*.scss",
+    ],
+  }
+}
 ```
 
 ### 参考实现
@@ -390,9 +392,8 @@ class YourModel(models.Model):
 1. 完整的 JavaScript 组件代码
 2. 完整的 XML 模板代码
 3. 完整的 SCSS 样式代码
-4. assets.xml 注册代码
-5. 使用文档和示例
-6. 测试建议（可选）
+4. 使用文档和示例
+5. 测试建议（可选）
 
 确保代码：
 - 完全符合 Odoo 16.0+ OWL 框架规范
