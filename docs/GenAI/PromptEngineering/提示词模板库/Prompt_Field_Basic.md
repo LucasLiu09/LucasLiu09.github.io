@@ -133,7 +133,8 @@ YourField.isEmpty = (record, fieldName) => {
     return record.data[fieldName] === false;
 };
 
-YourField.extractProps = ({ attrs }) => {
+YourField.extractProps = ({ attrs, field }) => {
+    const options = attrs.options;
     return {
         placeholder: attrs.placeholder,
         inputType: attrs.options.type,
@@ -199,6 +200,18 @@ registry.category("fields").add("your_field", YourField);
 - suffix: String         // 【后缀符号，如 '%'】
 - showZero: Boolean      // 【是否显示零值】
 - 【其他自定义选项】
+```
+
+#### extractProps
+```javacript
+YourField.extractProps = ({ attrs, field }) => {
+    const options = attrs.options;
+    return {
+        placeholder: attrs.placeholder,
+        inputType: attrs.options.type,
+        step: attrs.options.step,
+    };
+};
 ```
 
 #### Widget 使用示例
