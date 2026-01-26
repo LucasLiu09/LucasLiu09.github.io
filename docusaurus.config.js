@@ -87,7 +87,7 @@ const config = {
         title: 'Notebook',
         logo: {
           alt: 'Lucas',
-          src: 'img/home/lucas2_289x289.png',
+          src: 'img/home/lucas_smh.jpg',
         },
         items: [
           {
