@@ -139,6 +139,7 @@ const sidebars = {
              type: 'category',
              label: 'Fields',
              items: [
+                'odoo/dev_notes/front-end/fields/field_component_dev_guide',
                 'odoo/dev_notes/front-end/fields/integer_field_extend',
                 'odoo/dev_notes/front-end/fields/float_field_extend',
                 'odoo/dev_notes/front-end/fields/char_field_extension',
