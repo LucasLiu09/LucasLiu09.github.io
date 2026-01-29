@@ -18,7 +18,7 @@ last_update:
 
 **源码路径**: `odoo-16.0/addons/web/static/src/views/list/list_renderer.*`
 
-**日期**: 2026-01-20
+**日期**: 2026-01-29
 
 :::
 
