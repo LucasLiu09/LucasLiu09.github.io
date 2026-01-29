@@ -81,6 +81,7 @@ const sidebars = {
                 type: 'category',
                 label: 'Views',
                 items: [
+                    'odoo/dev_notes/source_code_analysis/views/list_renderer_analysis',
                     'odoo/dev_notes/source_code_analysis/views/list_view_open_record_dynamic',
                     'odoo/dev_notes/source_code_analysis/views/views_binding_actions',
                 ]
