@@ -76,12 +76,12 @@ last_update:
 
 此次修改设计部分：
 
-|                         | 修改前 | 修改后                                                                                                                                   |
-| ----------------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| setup                   |     |                                                                                                                                       |
-| getOptionalFields       |     | 移除`filter`只提取设置`col.optional`属性的逻辑，让其能拿到所有的列                                                                                          |
-| getOptionalActiveFields |     | 对this.optionalActiveFields更新时，修改了对col.optional的判断，从`col.optional==='show'`才视为activeField 改为 `!(col.optional==='hide')`就视为activeField. |
-| getActiveColumns        |     | 对filter的逻辑进行了修改，将原来"或"条件下的 `!col.optional`判定移除.                                                                                       |
-| toggleOptionalField     |     | 在调用`this.saveOptionalActiveFields`时，对`this.allColumns.filter`的逻辑进行了修改，将原来"且"条件下的`col.optional`判定移除.                                   |
+|                         | 修改后                                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| setup                   |                                                                                                                                       |
+| getOptionalFields       | 移除`filter`只提取设置`col.optional`属性的逻辑，让其能拿到所有的列                                                                                          |
+| getOptionalActiveFields | 对this.optionalActiveFields更新时，修改了对col.optional的判断，从`col.optional==='show'`才视为activeField 改为 `!(col.optional==='hide')`就视为activeField. |
+| getActiveColumns        | 对filter的逻辑进行了修改，将原来"或"条件下的 `!col.optional`判定移除.                                                                                       |
+| toggleOptionalField     | 在调用`this.saveOptionalActiveFields`时，对`this.allColumns.filter`的逻辑进行了修改，将原来"且"条件下的`col.optional`判定移除.                                   |
 
 
