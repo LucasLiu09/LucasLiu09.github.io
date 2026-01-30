@@ -22,6 +22,10 @@ last_update:
 
 ![list_renderer_columns_sortable_1](../../_images/list_renderer_columns_sortable_1.png "columns_sortable")
 
+## 实现效果
+
+![list_renderer_columns_sortable_2](../../_images/list_renderer_columns_sortable_2.gif "columns_sortable demo")
+
 涉及改动的模板内容(局部)：
 
 ```xml title="list_renderer.xml"
