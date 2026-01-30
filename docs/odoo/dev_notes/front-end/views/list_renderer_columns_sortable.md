@@ -54,16 +54,18 @@ last_update:
 
 ## `ListRenderer`部分逻辑解析
 
-- `this.allColumns`：在`setup`中赋值，来源与`this.props.archInfo.columns`。一般在上层已经经过处理，移除了 **(column_)invisible** 的节点(包括fields/buttons).
-- `this.state.columns`：在 **ListRenderer** 模板中遍历`this.state.columns`来渲染列。
-- `this.optionalActiveFields`：`Object({field_name: value})`，存储了所有列的显示状态。
-- `displayOptionalFields`: **Getter**，是否存在可选列(**optional field**)配置项。
-- `getOptionalFields`: **Getter**，返回一个Array，包含在xml中设置了optional属性的列(`label`、`name`、`value`)，其中value是该字段的显示状态，其显示状态是在setup中先判断localStorage是否有缓存，如果有的话就将缓存的显示状态赋值给value。
-- `toggleOptionalField(fieldName)`: 切换可选列(**optional field**)的显示/隐藏，通过先更新`this.optionalActiveFields`，再通过`this.getActiveColumns(this.props.list)`的结果来更新`this.state.columns`以实现对列表重新渲染的效果，在最后会更新`browser.localStorage`。
-- `getOptionalActiveFields()`: 在`setup()`中调用，更新`this.optionalActiveFields`；如果`browser.localStorage`有缓存，从`browser.localStorage`更新可选列的激活状态；否则可选列的显示状态由xml中`field`定义的`optional`属性来控制。
-- `getActiveColumns(list)`：根据配置（如可选列）获取当前应显示的列定义，用来更新`this.state.columns`，原生逻辑是通过判断xml中`field`未设置`optional`属性或`this.optionalActiveFields`中该`col.name`对应的值为`true`，就属于应显示的列。
-- `createKeyOptionalFields`: 生成用于本地存储(`browser.localStorage`)可选列配置的唯一键名。
-- `saveOptionalActiveFields()`：将调用该函数时的`this.optionalActiveFields`值为`true`的所有列名存储到`browser.localStorage`。
+| name | 说明 |
+|---|---|
+| `this.allColumns` | 在`setup`中赋值，来源于`this.props.archInfo.columns`。一般在上层已处理，移除了 **(column_)invisible** 的节点（包括 fields/buttons）。 |
+| `this.state.columns` | 在 **ListRenderer** 模板中遍历`this.state.columns`来渲染列。 |
+| `this.optionalActiveFields` | `Object({field_name: value})`，存储了所有列的显示状态。 |
+| `displayOptionalFields` | **Getter**，是否存在可选列（**optional field**）配置项。 |
+| `getOptionalFields` | **Getter**，返回一个 Array，包含在 xml 中设置了 optional 属性的列（`label`、`name`、`value`），其中 value 是该字段显示状态；`setup` 中先判断 localStorage 是否有缓存，有则用缓存状态赋值给 value。 |
+| `toggleOptionalField(fieldName)` | 切换可选列（**optional field**）显示/隐藏：先更新`this.optionalActiveFields`，再用`this.getActiveColumns(this.props.list)`结果更新`this.state.columns`触发列表重渲染，最后更新`browser.localStorage`。 |
+| `getOptionalActiveFields()` | 在`setup()`中调用，更新`this.optionalActiveFields`；若`browser.localStorage`有缓存则从中更新激活状态，否则显示状态由 xml 中`field`的`optional`属性控制。 |
+| `getActiveColumns(list)` | 根据配置（如可选列）获取当前应显示的列定义，用于更新`this.state.columns`；原生逻辑：若 xml 中`field`未设置`optional`属性，或`this.optionalActiveFields`里对应`col.name`的值为`true`，则属于应显示的列。 |
+| `createKeyOptionalFields` | 生成用于本地存储（`browser.localStorage`）可选列配置的唯一键名。 |
+| `saveOptionalActiveFields()` | 将调用该函数时`this.optionalActiveFields`值为`true`的所有列名存储到`browser.localStorage`。 |
 
 ---
 
