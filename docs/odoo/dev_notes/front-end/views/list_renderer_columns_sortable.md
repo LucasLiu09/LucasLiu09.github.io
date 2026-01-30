@@ -15,8 +15,8 @@ last_update:
 
 :::tip
 
-- ![ListRenderer分析文档](/docs/odoo/dev_notes/source_code_analysis/views/list_renderer_analysis)
-
+- [ListRenderer分析文档](/docs/odoo/dev_notes/source_code_analysis/views/list_renderer_analysis)
+- [SortableJS](https://github.com/SortableJS/Sortable)
 :::
 
 
