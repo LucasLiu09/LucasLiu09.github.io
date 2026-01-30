@@ -11,8 +11,16 @@ last_update:
   author: Lucas
 ---
 
-
 # ListRenderer可自定义显示及顺序
+
+:::tip
+
+- ![ListRenderer分析文档](/docs/odoo/dev_notes/source_code_analysis/views/list_renderer_analysis)
+
+:::
+
+
+![list_renderer_columns_sortable_1](../../_images/list_renderer_columns_sortable_1.png "columns_sortable")
 
 涉及改动的模板内容(局部)：
 
