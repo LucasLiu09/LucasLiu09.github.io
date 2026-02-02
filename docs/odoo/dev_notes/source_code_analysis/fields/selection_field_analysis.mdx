@@ -19,7 +19,6 @@ import TabItem from '@theme/TabItem';
 本文由AI生成+人工校正。
 :::
 
-
 本文基于以下源码文件做“沿 import 深入追踪”的解读，并补齐其在 Field 渲染与数据层（Record/Model）中的完整数据链路：
 
 - `library/odoo-16.0/addons/web/static/src/views/fields/selection/selection_field.js`
@@ -37,7 +36,11 @@ import TabItem from '@theme/TabItem';
 
 ---
 
-## 1. SelectionField 是什么：一个“用 `<select>` 渲染 selection 或 many2one”的字段组件
+## 1. SelectionField 是什么
+
+:::info
+**一个“用 `<select>` 渲染 selection 或 many2one”的字段组件**
+:::
 
 `SelectionField` 是一个 OWL `Component`，用同一套 `<select>` UI 支持两种字段类型：
 
@@ -51,7 +54,11 @@ import TabItem from '@theme/TabItem';
 
 ---
 
-## 2. 组件 props 来源：`Field` 包装器如何把 record/name/value/update 注入进来
+## 2. 组件 props 来源
+
+:::info
+**`Field` 包装器如何把 record/name/value/update 注入进来**
+:::
 
 `SelectionField.props` 基于 `standardFieldProps` 扩展：
 
@@ -73,9 +80,15 @@ import TabItem from '@theme/TabItem';
 
 ---
 
-## 3. SelectionField 的核心逻辑（JS）：options / string / value / onChange
+## 3. SelectionField 的核心逻辑（JS）
 
-### 3.1 options：分支处理 selection vs many2one
+:::info
+** options / string / value / onChange **
+:::
+
+### 3.1 options
+
+** 分支处理 selection vs many2one **
 
 组件通过 **底层字段真实类型** 决定 options 来源：
 
@@ -84,7 +97,9 @@ import TabItem from '@theme/TabItem';
 
 这点很关键：**即使 widget 名是 `"selection"`，many2one 的真实类型依旧是 `"many2one"`**，所以这里判断用的是 `record.fields[name].type`，而不是 widget/type prop。
 
-### 3.2 string：只读显示用的“人类可读文本”
+### 3.2 string
+
+** 只读显示用的“人类可读文本” **
 
 - many2one：`value ? value[1] : ""`
 - selection：通过 `options.find(o => o[0] === value)[1]` 找 label（value 为 false 时显示空）
@@ -93,14 +108,18 @@ import TabItem from '@theme/TabItem';
 
 - selection 分支假设当前值一定能在 `options` 里找到；若后端返回了一个不在 selection 列表中的值，`find` 可能返回 `undefined` 并导致访问 `[1]` 出错（通常不会发生，但属于隐含前提）。
 
-### 3.3 value：用于 `<select>` 比对 selected 的“原子值”
+### 3.3 value
+
+** 用于 `<select>` 比对 selected 的“原子值” **
 
 因为 many2one 的 `props.value` 是 `[id, name]`，而 `<option value>` 需要存 id：
 
 - many2one：返回 `value[0]`
 - selection：返回原始值（可能是 string / number / false）
 
-### 3.4 stringify/parse：用 JSON 承载 `<option value>`
+### 3.4 stringify/parse
+
+** 用 JSON 承载 `<option value>` **
 
 模板里 `t-att-value="stringify(option[0])"`，`onchange`事件里 `JSON.parse(ev.target.value)`。
 
@@ -109,7 +128,9 @@ import TabItem from '@theme/TabItem';
 - 统一处理 `false`、数字、字符串等，不需要自己做类型转换；
 - 避免 `<option value>` 永远是 string 的问题（parse 后能恢复原类型）。
 
-### 3.5 onChange：把 `<select>` 的原子值写回 record
+### 3.5 onChange
+
+** 把 `<select>` 的原子值写回 record **
 
 - many2one：
   - 选中 placeholder（false）→ `update(false)`
@@ -120,7 +141,9 @@ import TabItem from '@theme/TabItem';
 
 ---
 
-## 4. 模板结构（XML）：readonly 与 editable 两种渲染
+## 4. 模板结构（XML）
+
+** readonly 与 editable 两种渲染 **
 
 模板 `web.SelectionField`：
 
@@ -138,9 +161,15 @@ import TabItem from '@theme/TabItem';
 
 ---
 
-## 5. many2one 作为“下拉 selection”的关键：preloadedData 预加载机制
+## 5. many2one 作为“下拉 selection”的关键
 
-### 5.1 新模型路径：`views/relational_model.js` 的 `loadPreloadedData()`
+:::info
+** many2one 作为“下拉 selection”的关键：preloadedData 预加载机制 **
+:::
+
+### 5.1 新模型路径
+
+** `views/relational_model.js` 的 `loadPreloadedData()` **
 
 `relational_model.js` 内部维护：
 
@@ -166,7 +195,9 @@ Record 在 `_load()` 流程中会：
 
 此外，在 `_update()`（字段更新并可能触发 onchange）后，也会 `proms.push(this.loadPreloadedData())`，确保域变化/上下文变化时 options 会刷新。
 
-### 5.2 SelectionField 的预加载注册：`registry.category("preloadedData").add("selection", ...)`
+### 5.2 SelectionField 的预加载注册
+
+** `registry.category("preloadedData").add("selection", ...)` **
 
 `selection_field.js` 同时注册了 preloadedData：
 
@@ -180,7 +211,11 @@ Record 在 `_load()` 流程中会：
 
 ---
 
-## 6. 兼容/遗留路径：`legacySpecialData` 如何把 legacy specialData 变成 record.preloadedData
+## 6. 兼容/遗留路径
+
+:::info
+`legacySpecialData` 如何把 legacy specialData 变成 record.preloadedData
+:::
 
 你会看到 `SelectionField` 还定义了：
 
@@ -188,7 +223,9 @@ Record 在 `_load()` 流程中会：
 
 这不是给新模型 `relational_model.js` 用的，而是为了 **OWL 视图仍复用 legacy BasicModel 数据层** 的场景：
 
-### 6.1 OWL → legacy fieldsInfo：`views/legacy_utils.js`
+### 6.1 OWL → legacy fieldsInfo
+
+** `views/legacy_utils.js` **
 
 在 `mapActiveFieldsToFieldsInfo()` 中，会把 FieldComponent 的 `legacySpecialData` 写入 legacy fieldsInfo：
 
@@ -196,7 +233,9 @@ Record 在 `_load()` 流程中会：
 
 这会导致 legacy BasicModel 在加载字段时，按 `specialData` 字符串调用对应的 fetch 方法。
 
-### 6.2 legacy BasicModel：`_fetchSpecialRelation` 实际就是 `name_search`
+### 6.2 legacy BasicModel
+
+** `_fetchSpecialRelation` 实际就是 `name_search` **
 
 在 `legacy/js/views/basic/basic_model.js` 中：
 
@@ -223,7 +262,9 @@ Record 在 `_load()` 流程中会：
 
 ---
 
-## 7. registry 与 displayName：为什么这么写
+## 7. registry 与 displayName
+
+registry 与 displayName：为什么这么写
 
 - `registry.category("fields").add("selection", SelectionField)`
   - Field 包装器会按 widget/viewType/fieldType 等规则从 registry 取 FieldComponent
@@ -232,7 +273,9 @@ Record 在 `_load()` 流程中会：
 
 ---
 
-## 8. 样式（SCSS）：弱化非交互态的下拉箭头
+## 8. 样式（SCSS）
+
+弱化非交互态的下拉箭头
 
 `selection_field.scss` 的意图是：在非触屏设备上，当字段不 hover 且不 focus 时，隐藏 `<select>` 的 `background-image`（通常是下拉箭头），减少视觉噪音。
 
