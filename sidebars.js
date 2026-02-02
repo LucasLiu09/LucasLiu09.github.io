@@ -76,6 +76,7 @@ const sidebars = {
                     'odoo/dev_notes/source_code_analysis/fields/binary_field_analysis',
                     'odoo/dev_notes/source_code_analysis/fields/selection_field_analysis',
                     'odoo/dev_notes/source_code_analysis/fields/x2many_field_analysis',
+                    'odoo/dev_notes/source_code_analysis/fields/preloadedData',
                 ]
             },
             {
