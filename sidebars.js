@@ -196,6 +196,8 @@ const sidebars = {
           label: '第三方集成',
           items: [
             'odoo/dev_notes/third_party_integration/leaflet',
+            'odoo/dev_notes/third_party_integration/sortableJS',
+            'odoo/dev_notes/third_party_integration/sortableJS_odoo',
           ]
          },
         {
