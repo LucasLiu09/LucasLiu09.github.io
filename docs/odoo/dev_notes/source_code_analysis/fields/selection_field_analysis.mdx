@@ -1,0 +1,424 @@
+---
+title: SelectionField解析(Odoo16)
+description: SelectionField解析(Odoo16)
+sidebar_label: SelectionField解析(Odoo16)
+keyword:
+    - odoo
+    - odoo development
+tags: [odoo]
+last_update:
+  date: 2026/02/02
+  author: Lucas
+---
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# SelectionField 组件源码解析（Odoo 16 Web）
+
+:::tip[备注]
+本文由AI生成+人工校正。
+:::
+
+
+本文基于以下源码文件做“沿 import 深入追踪”的解读，并补齐其在 Field 渲染与数据层（Record/Model）中的完整数据链路：
+
+- `library/odoo-16.0/addons/web/static/src/views/fields/selection/selection_field.js`
+- `library/odoo-16.0/addons/web/static/src/views/fields/selection/selection_field.xml`
+
+同时追踪到的关键依赖：
+
+- `library/odoo-16.0/addons/web/static/src/views/fields/field.js`（Field 包装器：生成 props / update 写回）
+- `library/odoo-16.0/addons/web/static/src/views/relational_model.js`（新模型：preloadedData 注册表 + 预加载触发）
+- `library/odoo-16.0/addons/web/static/src/views/basic_relational_model.js`（兼容模型：legacy specialData → record.preloadedData）
+- `library/odoo-16.0/addons/web/static/src/views/legacy_utils.js`（OWL 字段描述 → legacy fieldsInfo 的 specialData 映射）
+- `library/odoo-16.0/addons/web/static/src/legacy/js/views/basic/basic_model.js`（legacy `_fetchSpecialRelation`：name_search + 缓存）
+- `library/odoo-16.0/addons/web/static/src/core/registry.js`（registry 实现）
+- `library/odoo-16.0/addons/web/static/src/core/l10n/translation.js`（`_lt` 懒翻译）
+
+---
+
+## 1. SelectionField 是什么：一个“用 `<select>` 渲染 selection 或 many2one”的字段组件
+
+`SelectionField` 是一个 OWL `Component`，用同一套 `<select>` UI 支持两种字段类型：
+
+- **selection**：直接使用字段定义里的 `field.selection` 列表作为 options。
+- **many2one（通过 widget=selection）**：把 many2one 以“下拉列表”呈现，options 来自 **预加载**（`record.preloadedData[fieldName]`），底层通过 `name_search` 获取候选项。
+
+它被注册到字段 registry 中（key 为 `"selection"`），因此：
+
+- selection 字段（type=selection）默认会命中该组件；
+- many2one 字段如果在 arch 上写 `widget="selection"` 也会命中该组件。
+
+---
+
+## 2. 组件 props 来源：`Field` 包装器如何把 record/name/value/update 注入进来
+
+`SelectionField.props` 基于 `standardFieldProps` 扩展：
+
+- `record`：Record 实例（新模型/兼容模型均有）
+- `name`：字段名
+- `value`：`record.data[name]`
+- `update(value)`：写回 record 的统一入口（内部会触发 onchange / save 等）
+- `readonly`：综合视图状态、modifier 计算后的只读标识
+- 额外：`placeholder`（来自 xml attrs）
+
+这些都是由 `views/fields/field.js` 在渲染具体 FieldComponent 前组装：
+
+- `value` 固定取 `record.data[name]`
+- `update` 内部调用 `record.update({[name]: value})`，必要时自动 `record.save()`
+- `readonly` 会结合 record 是否处于 edit、以及 modifiers 的 readonly 计算
+- `extractProps` 用于把 `<field ... placeholder="..."/>` 这种 attrs 映射到组件 props
+
+因此 `SelectionField` 本身只关心 UI + 值映射，不负责 RPC/onchange/save。
+
+---
+
+## 3. SelectionField 的核心逻辑（JS）：options / string / value / onChange
+
+### 3.1 options：分支处理 selection vs many2one
+
+组件通过 **底层字段真实类型** 决定 options 来源：
+
+- 字段类型为 `"selection"`：取 `record.fields[name].selection` 并过滤掉 `false` 与空 label。
+- 字段类型为 `"many2one"`：取 `record.preloadedData[name]`（预加载的数据，结构与 `name_search` 一致，为 `[id, display_name]` 的数组）。
+
+这点很关键：**即使 widget 名是 `"selection"`，many2one 的真实类型依旧是 `"many2one"`**，所以这里判断用的是 `record.fields[name].type`，而不是 widget/type prop。
+
+### 3.2 string：只读显示用的“人类可读文本”
+
+- many2one：`value ? value[1] : ""`
+- selection：通过 `options.find(o => o[0] === value)[1]` 找 label（value 为 false 时显示空）
+
+说明：
+
+- selection 分支假设当前值一定能在 `options` 里找到；若后端返回了一个不在 selection 列表中的值，`find` 可能返回 `undefined` 并导致访问 `[1]` 出错（通常不会发生，但属于隐含前提）。
+
+### 3.3 value：用于 `<select>` 比对 selected 的“原子值”
+
+因为 many2one 的 `props.value` 是 `[id, name]`，而 `<option value>` 需要存 id：
+
+- many2one：返回 `value[0]`
+- selection：返回原始值（可能是 string / number / false）
+
+### 3.4 stringify/parse：用 JSON 承载 `<option value>`
+
+模板里 `t-att-value="stringify(option[0])"`，`onchange`事件里 `JSON.parse(ev.target.value)`。
+
+好处：
+
+- 统一处理 `false`、数字、字符串等，不需要自己做类型转换；
+- 避免 `<option value>` 永远是 string 的问题（parse 后能恢复原类型）。
+
+### 3.5 onChange：把 `<select>` 的原子值写回 record
+
+- many2one：
+  - 选中 placeholder（false）→ `update(false)`
+  - 选中某 id → 在 `options` 中找到 `[id, name]` 这一对 → `update([id, name])`
+- selection：直接 `update(value)`
+
+因此 many2one 分支写回的是 OWL 侧统一使用的 many2one 值结构：`[id, display_name] | false`。
+
+---
+
+## 4. 模板结构（XML）：readonly 与 editable 两种渲染
+
+模板 `web.SelectionField`：
+
+- **readonly**：渲染 `<span t-esc="string" t-att-raw-value="value" />`
+  - `raw-value` 绑定的是“原子值”（many2one 为 id，selection 为值），便于调试或外部 DOM 使用。
+- **editable**：
+  - `<select class="o_input pe-3" ...>`
+  - 第一项是 placeholder：
+    - `value=false` 时选中
+    - 若字段 required，则通过 `style="display:none"` 隐藏 placeholder（避免用户保留空值）
+  - 其余 option 遍历 `options`：
+    - selected 比对 `option[0] === value`
+    - value 为 JSON.stringify(option[0])
+    - 文本为 `option[1]`
+
+---
+
+## 5. many2one 作为“下拉 selection”的关键：preloadedData 预加载机制
+
+### 5.1 新模型路径：`views/relational_model.js` 的 `loadPreloadedData()`
+
+`relational_model.js` 内部维护：
+
+- `const preloadedDataRegistry = registry.category("preloadedData");`
+
+Record 在 `_load()` 流程中会：
+
+1. `await this.loadRelationalData();`（many2one/relation name_get 等）
+2. `await this.loadPreloadedData();`（预加载）
+
+`loadPreloadedData()` 的逻辑要点：
+
+- 遍历 activeFields
+- 用 `activeField.widget || this.fields[fieldName].type` 得到一个“type key”
+- 若字段可见且 registry 中存在该 key，则执行 `info.preload(orm, record, fieldName)`
+- 通过 domain + extraMemoizationKey 做缓存键，避免不必要的 RPC
+
+所以对于 `<field name="partner_id" widget="selection"/>`：
+
+- `activeField.widget === "selection"`
+- 命中 `registry.category("preloadedData").get("selection")`
+- 然后再由该 info 的 `loadOnTypes` 限制仅对 many2one 生效
+
+此外，在 `_update()`（字段更新并可能触发 onchange）后，也会 `proms.push(this.loadPreloadedData())`，确保域变化/上下文变化时 options 会刷新。
+
+### 5.2 SelectionField 的预加载注册：`registry.category("preloadedData").add("selection", ...)`
+
+`selection_field.js` 同时注册了 preloadedData：
+
+- key：`"selection"`（与 widget 名一致）
+- `loadOnTypes: ["many2one"]`（仅对 many2one 字段做预加载）
+- `preload(orm, record, fieldName)`：调用
+  - `record.getFieldDomain(fieldName).toList(context)`
+  - `orm.call(field.relation, "name_search", ["", domain])`
+
+返回结果即为 `name_search` 的 pairs：`[[id, display_name], ...]`，被放入 `record.preloadedData[fieldName]`，从而被 `SelectionField.options` 读取。
+
+---
+
+## 6. 兼容/遗留路径：`legacySpecialData` 如何把 legacy specialData 变成 record.preloadedData
+
+你会看到 `SelectionField` 还定义了：
+
+- `SelectionField.legacySpecialData = "_fetchSpecialRelation";`
+
+这不是给新模型 `relational_model.js` 用的，而是为了 **OWL 视图仍复用 legacy BasicModel 数据层** 的场景：
+
+### 6.1 OWL → legacy fieldsInfo：`views/legacy_utils.js`
+
+在 `mapActiveFieldsToFieldsInfo()` 中，会把 FieldComponent 的 `legacySpecialData` 写入 legacy fieldsInfo：
+
+- `specialData: FieldComponent && FieldComponent.legacySpecialData`
+
+这会导致 legacy BasicModel 在加载字段时，按 `specialData` 字符串调用对应的 fetch 方法。
+
+### 6.2 legacy BasicModel：`_fetchSpecialRelation` 实际就是 `name_search`
+
+在 `legacy/js/views/basic/basic_model.js` 中：
+
+- `_fetchSpecialRelation(record, fieldName)`：
+  - 校验字段类型属于 many2one/m2m/o2m
+  - 计算 context + domain
+  - 做缓存（避免重复 rpc）
+  - RPC：`model: field.relation, method: "name_search", args: ["", domain], context`
+
+返回的仍是 `name_search` pairs。
+
+### 6.3 兼容模型把 legacy specialData 映射到 `record.preloadedData`
+
+在 `views/basic_relational_model.js` 的 `Record.__syncData()` 中，如果 legacy datapoint 存在 `specialData[fieldName]`：
+
+- `this.preloadedData[fieldName] = legDP.specialData[fieldName];`
+
+于是 `SelectionField.options` 的 many2one 分支仍然能工作。
+
+结论：**SelectionField 同时兼容两条数据链路**
+
+- 新模型：`preloadedData` registry → `record.preloadedData[fieldName]`
+- 兼容模型：`legacySpecialData` → legacy specialData → `record.preloadedData[fieldName]`
+
+---
+
+## 7. registry 与 displayName：为什么这么写
+
+- `registry.category("fields").add("selection", SelectionField)`
+  - Field 包装器会按 widget/viewType/fieldType 等规则从 registry 取 FieldComponent
+- `SelectionField.displayName = _lt("Selection")`
+  - `_lt` 是“懒翻译字符串”，避免模块加载早于翻译加载导致的显示问题
+
+---
+
+## 8. 样式（SCSS）：弱化非交互态的下拉箭头
+
+`selection_field.scss` 的意图是：在非触屏设备上，当字段不 hover 且不 focus 时，隐藏 `<select>` 的 `background-image`（通常是下拉箭头），减少视觉噪音。
+
+---
+
+## 9. 实际使用方式（推导）
+
+### 9.1 selection 字段（type=selection）
+
+无需 widget：
+
+```xml
+<field name="state" placeholder="请选择状态"/>
+```
+
+会根据字段定义 `selection=[("a","A"), ...]` 渲染 options。
+
+### 9.2 many2one 字段渲染为下拉（widget=selection）
+
+```xml
+<field name="partner_id" widget="selection" placeholder="请选择客户"/>
+```
+
+- Field 组件会选中 registry key 为 `"selection"` 的组件，即 `SelectionField`
+- Record 会通过 `preloadedData`（或 legacy specialData）预加载 `partner_id` 的 `name_search` 结果
+- 下拉 options = `record.preloadedData.partner_id`
+
+---
+
+## 10. 小结：SelectionField 的“完整数据流”
+
+从渲染到写回的链路可概括为：
+
+1. **解析 arch**：生成 `fieldInfo`（包含 widget/attrs/propsFromAttrs 等）
+2. **Field 包装器**：
+   - 从 registry 选出 `SelectionField`
+   - 组装 `SelectionField.props`（record/name/value/update/readonly/placeholder…）
+3. **Record 加载**：
+   - `_load()` 后调用 `loadPreloadedData()`（新模型）或 legacy specialData（兼容模型）
+   - 把 `name_search` pairs 放到 `record.preloadedData[fieldName]`
+4. **SelectionField 渲染**：
+   - selection：用字段定义 selection
+   - many2one：用 `record.preloadedData[fieldName]`
+5. **用户选择**：
+   - `onChange` → `props.update(...)` → `record.update(...)`（必要时触发 onchange/save）
+   - 更新后再次 `loadPreloadedData()`，保证 options 与 domain/context 同步
+
+# 源码
+
+<Tabs groupId="source-code">
+  <TabItem value="selection_field.js" label="selection_field.js" default>
+
+```javascript
+/** @odoo-module **/
+
+import { registry } from "@web/core/registry";
+import { _lt } from "@web/core/l10n/translation";
+import { standardFieldProps } from "../standard_field_props";
+
+import { Component } from "@odoo/owl";
+
+export class SelectionField extends Component {
+    get options() {
+        switch (this.props.record.fields[this.props.name].type) {
+            case "many2one":
+                return [...this.props.record.preloadedData[this.props.name]];
+            case "selection":
+                return this.props.record.fields[this.props.name].selection.filter(
+                    (option) => option[0] !== false && option[1] !== ""
+                );
+            default:
+                return [];
+        }
+    }
+    get string() {
+        switch (this.props.type) {
+            case "many2one":
+                return this.props.value ? this.props.value[1] : "";
+            case "selection":
+                return this.props.value !== false
+                    ? this.options.find((o) => o[0] === this.props.value)[1]
+                    : "";
+            default:
+                return "";
+        }
+    }
+    get value() {
+        const rawValue = this.props.value;
+        return this.props.type === "many2one" && rawValue ? rawValue[0] : rawValue;
+    }
+    get isRequired() {
+        return this.props.record.isRequired(this.props.name);
+    }
+
+    stringify(value) {
+        return JSON.stringify(value);
+    }
+
+    /**
+     * @param {Event} ev
+     */
+    onChange(ev) {
+        const value = JSON.parse(ev.target.value);
+        switch (this.props.type) {
+            case "many2one":
+                if (value === false) {
+                    this.props.update(false);
+                } else {
+                    this.props.update(this.options.find((option) => option[0] === value));
+                }
+                break;
+            case "selection":
+                this.props.update(value);
+                break;
+        }
+    }
+}
+
+SelectionField.template = "web.SelectionField";
+SelectionField.props = {
+    ...standardFieldProps,
+    placeholder: { type: String, optional: true },
+};
+
+SelectionField.displayName = _lt("Selection");
+SelectionField.supportedTypes = ["many2one", "selection"];
+SelectionField.legacySpecialData = "_fetchSpecialRelation";
+
+SelectionField.isEmpty = (record, fieldName) => record.data[fieldName] === false;
+SelectionField.extractProps = ({ attrs }) => {
+    return {
+        placeholder: attrs.placeholder,
+    };
+};
+
+registry.category("fields").add("selection", SelectionField);
+
+export function preloadSelection(orm, record, fieldName) {
+    const field = record.fields[fieldName];
+    const context = record.evalContext;
+    const domain = record.getFieldDomain(fieldName).toList(context);
+    return orm.call(field.relation, "name_search", ["", domain]);
+}
+
+registry.category("preloadedData").add("selection", {
+    loadOnTypes: ["many2one"],
+    preload: preloadSelection,
+});
+
+```
+    
+  </TabItem>
+
+  <TabItem value="selection_field.xml" label="selection_field.xml" default>
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="web.SelectionField" owl="1">
+        <t t-if="props.readonly">
+            <span t-esc="string" t-att-raw-value="value" />
+        </t>
+        <t t-else="">
+            <select class="o_input" t-on-change="onChange" t-att-id="props.id">
+                <option
+                    t-att-selected="false === value"
+                    t-att-value="stringify(false)"
+                    t-esc="this.props.placeholder || ''"
+                    t-attf-style="{{ isRequired ? 'display:none' : '' }}"
+                />
+                <t t-foreach="options" t-as="option" t-key="option[0]">
+                    <option
+                        t-att-selected="option[0] === value"
+                        t-att-value="stringify(option[0])"
+                        t-esc="option[1]"
+                    />
+                </t>
+            </select>
+        </t>
+    </t>
+
+</templates>
+
+```
+    
+  </TabItem>
+</Tabs>
+        
