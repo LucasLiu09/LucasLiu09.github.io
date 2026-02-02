@@ -16,8 +16,8 @@ last_update:
 :::tip[备注]
 本文面向“第一次上手 SortableJS”的场景，覆盖：安装/引入、创建实例、常用配置、事件、方法、持久化（store）、常见问题与最佳实践。
 
-- 项目仓库：`https://github.com/SortableJS/Sortable`
-- Demo：`http://sortablejs.github.io/Sortable/`
+- [项目仓库](https://github.com/SortableJS/Sortable)
+- [Demo](http://sortablejs.github.io/Sortable/)
 
 :::
 
@@ -241,5 +241,5 @@ Sortable.create(listB, { group: "shared" });
 
 ## 9. 进一步阅读
 
-- SortableJS README（选项、事件、插件更完整）：`https://github.com/SortableJS/Sortable`
+- [SortableJS README（选项、事件、插件更完整）](https://github.com/SortableJS/Sortable)
 
