@@ -27,8 +27,8 @@ last_update:
 
 Odoo 16 的 Web 端处于新旧体系共存阶段：
 
-- **新体系（@web/**）**：OWL 组件 + 新 `Model` 基类（`@web/views/model`），服务通过依赖注入（action/dialog/notification/orm 等）。
-- **旧体系（legacy web.***）**：以 `web.BasicModel` 为核心的数据层，负责与后端 ORM RPC 交互、onchange、x2many commands、域/上下文计算、并发串行化（mutex）等。
+- **新体系（@web/***）**：OWL 组件 + 新 `Model` 基类（`@web/views/model`），服务通过依赖注入（action/dialog/notification/orm 等）。
+- **旧体系（legacy web.*）**：以 `web.BasicModel` 为核心的数据层，负责与后端 ORM RPC 交互、onchange、x2many commands、域/上下文计算、并发串行化（mutex）等。
 
 `basic_relational_model.js` 的定位就是：
 
@@ -38,7 +38,7 @@ Odoo 16 的 Web 端处于新旧体系共存阶段：
   - **StaticList**：x2many 的静态列表（one2many/many2many 的子列表 datapoint）
 - 提供 **数据格式映射**（moment ↔ luxon、legacy m2o/reference 结构 ↔ OWL 组件期望结构），以及 **校验/保存/丢弃/重排** 等上层 API。
 
-一句话：**它是“新视图层 `<->` legacy BasicModel”的适配层**。
+一句话：**它是“新视图层 ↔ legacy BasicModel”的适配层**。
 
 | 类 | 角色/粒度 | 主要职责 | 关键点/典型方法 |
 | --- | --- | --- | --- |
