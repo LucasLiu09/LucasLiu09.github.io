@@ -672,8 +672,8 @@ DropdownItem.defaultProps = {
 
 `Dropdown`内部主要由两部分组成：
 
-- slot="toggler": Dropdown显示的点击部分（此处通过一个只读的input标签来显示值）
-- 其余children: 点击Dropdown后打开的内容（上面例子通过遍历`state.options`来渲染多项`DropdownItem`）
+- **slot="toggler"**: Dropdown显示的点击部分（此处通过一个只读的input标签来显示值）
+- **其余children**: 点击Dropdown后打开的内容（上面例子通过遍历`state.options`来渲染多项`DropdownItem`）
 
 以上例子在`Dropdown`中传递了`toggleClass`来设置按钮的class属性，通过`beforeOpen`来指定打开前的回调函数，来做一些预处理操作（例如对于即将打开的内容进行更新，或通过rpc获取一些数据）。
 
@@ -682,5 +682,7 @@ DropdownItem.defaultProps = {
 `DropdownItem`最主要的逻辑在于`onSelected`这个props的传递，它是点击这一个`DropdownItem`时调用的函数。通常在这个函数中更新一些数据或者调用一些外部操作。
 
 :::tip
-通常我们使用`Dropdown`时，会在其内部搭配`DropdownItem`使用来处理其打开后的可操作选项。
+- 通常我们使用`Dropdown`时，会在其内部搭配`DropdownItem`使用来处理其打开后的可操作选项。
+- 在组件的标签中的属性，都是props的传递，这些位置的"="右边是**表达式**，所以在传递一些字符串时需要加上引号。例如Dropdown组件的class，就需要写成 `<Dropdown class="'text-primary'" />`。
 :::
+
