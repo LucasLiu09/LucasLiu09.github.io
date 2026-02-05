@@ -136,7 +136,7 @@ last_update:
 假设 `my_selection` 的 selection 候选中，值为 `'bug'` 的选项在`type`类别为 `dev` 时不可见：
 
 ```xml
-<field name="co_code"/>
+<field name="type"/>
 <field name="my_selection"
        widget="selection_hide_options"
        options="{
