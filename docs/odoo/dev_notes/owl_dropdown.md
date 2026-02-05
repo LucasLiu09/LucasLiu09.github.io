@@ -638,3 +638,49 @@ DropdownItem.defaultProps = {
 - **`title`**(string): 鼠标移入DropdownItem时显示的提示信息(title)。
 - **`dataset`**(object): DropdownItem的data-*属性。
 :::
+
+---
+
+## 简单示例
+
+下面以一些代码片段来对Dropdown进行说明
+
+```xml title="my_template.xml"
+
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_template" owl="1">
+        <t t-if="props.readonly">
+            <span t-esc="state.string" t-att-raw-value="value" />
+        </t>
+        <t t-else="">
+            <Dropdown class="''" togglerClass="'btn btn-secondary py-0'" beforeOpen.bind="beforeOpen">
+                <t t-set-slot="toggler">
+                    <input class="o_input text-start" readonly="true" t-ref="inputRef" type="text" t-esc="state.string" t-att-value="state.string" t-att-id="props.name"/>
+                </t>
+                <DropdownItem t-if="!isRequired" t-esc="''" onSelected="() => this.onSelected(false)" class="'o_empty_dropdown_item'" />
+                <t t-foreach="state.options" t-as="option" t-key="option[0]">
+                    <DropdownItem t-if="!isHide(option[0])" t-esc="option[1]" onSelected="() => this.onSelected(option[0])" />
+                </t>
+            </Dropdown>
+        </t>
+    </t>
+
+</templates>
+```
+
+`Dropdown`内部主要由两部分组成：
+
+- slot="toggler": Dropdown显示的点击部分（此处通过一个只读的input标签来显示值）
+- 其余children: 点击Dropdown后打开的内容（上面例子通过遍历`state.options`来渲染多项`DropdownItem`）
+
+以上例子在`Dropdown`中传递了`toggleClass`来设置按钮的class属性，通过`beforeOpen`来指定打开前的回调函数，来做一些预处理操作（例如对于即将打开的内容进行更新，或通过rpc获取一些数据）。
+
+在这个例子中，`beforeOpen`中会更新`state.options`来动态控制显示的选项。
+
+`DropdownItem`最主要的逻辑在于`onSelected`这个props的传递，它是点击这一个`DropdownItem`时调用的函数。通常在这个函数中更新一些数据或者调用一些外部操作。
+
+:::tip
+通常我们使用`Dropdown`时，会在其内部搭配`DropdownItem`使用来处理其打开后的可操作选项。
+:::
