@@ -64,14 +64,14 @@ slug: /odoo16/web/form/form-renderer
 
 ## 关键依赖
 
-| 依赖 | 文件 | 与本组件关系 |
+| 依赖 | 与本组件关系 | 文件 |
 | --- | --- | --- |
-| `useViewCompiler` | `views/view_compiler.js` | `FormRenderer.setup()` 用它把 `archInfo.arch+xmlDoc` 编译成 `this.templates`，模板随后用于 `t-call` |
-| `FormCompiler` | `views/form/form_compiler.js` | form 专属编译器：实现 `<form>/<sheet>/<group>/<header>/<notebook>` 等节点的编译与 UI 结构化 |
-| `Field` | `views/fields/field.js` | 被编译器生成；`FormCompiler` 注入 `setDirty` 回调后，字段 widget 可上报“本地脏态”给 Controller |
-| `ViewButton` | `views/view_button/view_button.js` | 被编译器生成；`FormCompiler` 注入 `disable/enable`，配合 `useViewButtons()` 的动作执行管线 |
-| `Notebook` | `core/notebook/notebook` | 编译器给它绑定 `defaultPage/onPageUpdate`，实现页签状态持久化 |
-| `useBounceButton` | `views/view_hook.js` | 只读态点击标题/分组区域时触发“catch attention”动效（引导用户进入编辑或关注主要按钮） |
+| `useViewCompiler` | `FormRenderer.setup()` 用它把 `archInfo.arch+xmlDoc` 编译成 `this.templates`，模板随后用于 `t-call` | `views/view_compiler.js` |
+| `FormCompiler` | form 专属编译器：实现 `<form>/<sheet>/<group>/<header>/<notebook>` 等节点的编译与 UI 结构化 | `views/form/form_compiler.js` |
+| `Field` | 被编译器生成；`FormCompiler` 注入 `setDirty` 回调后，字段 widget 可上报“本地脏态”给 Controller | `views/fields/field.js` |
+| `ViewButton` | 被编译器生成；`FormCompiler` 注入 `disable/enable`，配合 `useViewButtons()` 的动作执行管线 | `views/view_button/view_button.js` |
+| `Notebook` | 编译器给它绑定 `defaultPage/onPageUpdate`，实现页签状态持久化 | `core/notebook/notebook` |
+| `useBounceButton` | 只读态点击标题/分组区域时触发“catch attention”动效（引导用户进入编辑或关注主要按钮） | `views/view_hook.js` |
 
 ---
 
