@@ -1,7 +1,7 @@
 ---
 title: ConfirmationDialogWithInput
 description: OWL - 支持自定义输入框的确认弹窗
-sidebar_label: OWL - 支持自定义输入框的确认弹窗
+sidebar_label: 支持自定义输入框的确认弹窗
 keywords:
 - odoo
 - odoo development
