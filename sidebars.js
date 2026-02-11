@@ -96,6 +96,7 @@ const sidebars = {
                 type: 'category',
                 label: 'Components',
                 items: [
+                    'odoo/dev_notes/source_code_analysis/components/component',
                     'odoo/dev_notes/source_code_analysis/components/action_menus_analyze',
                     'odoo/dev_notes/source_code_analysis/components/onWillUpdateProps',
                 ]
