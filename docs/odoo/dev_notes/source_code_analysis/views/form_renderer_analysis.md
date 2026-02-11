@@ -1,5 +1,4 @@
 ---
-id: odoo16-web-form-renderer
 title: Odoo 16 FormRenderer 源码解析
 sidebar_label: FormRenderer
 description: Odoo 16 Web 表单视图 FormRenderer（基于 useViewCompiler/FormCompiler 的编译渲染链路，含 Field/ViewButton/Notebook 与 FormController 的回调协作）源码梳理。
