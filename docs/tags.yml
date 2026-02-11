@@ -3,6 +3,16 @@ odoo:
   permalink: '/odoo'
   description: 'Odoo - ERP'
 
+odoo-web:
+  label: 'Odoo Web'
+  permalink: '/odoo'
+  description: 'Odoo - Web'
+
+odoo-controller:
+  label: 'Odoo Controller'
+  permalink: '/odoo'
+  description: 'Odoo - Controller'
+
 projectManager:
   label: 'Project Manager'
 
