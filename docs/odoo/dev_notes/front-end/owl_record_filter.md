@@ -1,7 +1,7 @@
 ---
 title: 在Qweb中使用m2x选择模型数据(odoo16)
 description: 在Qweb中使用m2x选择模型数据(odoo16)
-sidebar_label: OWL - 在Qweb中使用m2x选择模型数据
+sidebar_label: 在Qweb中使用m2x选择模型数据
 keywords:
 - odoo
 - odoo development
