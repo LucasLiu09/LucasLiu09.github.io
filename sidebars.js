@@ -86,8 +86,8 @@ const sidebars = {
                 items: [
                     'odoo/dev_notes/source_code_analysis/views/list_renderer_analysis',
                     'odoo/dev_notes/source_code_analysis/views/list_view_open_record_dynamic',
-                    'odoo16/web/form/form-controller',
-                    'odoo16/web/form/form-renderer',
+                    'odoo/dev_notes/source_code_analysis/views/form_controller_analysis',
+                    'odoo/dev_notes/source_code_analysis/views/form_renderer_analysis',
                     'odoo/dev_notes/source_code_analysis/views/views_binding_actions',
                     'odoo/dev_notes/source_code_analysis/common/basic_relational_model_analysis',
                 ]
