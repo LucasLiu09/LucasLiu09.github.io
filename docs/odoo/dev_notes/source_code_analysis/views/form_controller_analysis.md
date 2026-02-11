@@ -39,7 +39,9 @@ slug: /odoo16/web/form/form-controller
 
 ---
 
-## `FormController` 方法速查表（按“定位源码”视角）
+## 方法速查表
+
+### FormController
 
 | 方法/属性 | 触发时机/入口 | 逻辑简述 | 与 `FormRenderer`/模板的关系 |
 | --- | --- | --- | --- |
@@ -64,7 +66,7 @@ slug: /odoo16/web/form/form-controller
 | `discard()` | 控制面板 Discard/取消 | 可走 `props.discardRecord`；否则 `record.discard()`；必要时 `historyBack()` | 丢弃后可能返回上一页/关闭对话框历史 |
 | `get className()` | 模板渲染时 | 根据 `ui.size/env.inDialog/hasTouch` 组合 class（含 `o_field_highlight` 等） | 直接影响 `web.FormView` 根容器样式与响应式布局 |
 
-## `FormStatusIndicator` 方法速查表（控制面板右侧）
+### FormStatusIndicator
 
 | 方法/属性 | 触发时机/入口 | 逻辑简述 |
 | --- | --- | --- |
@@ -72,7 +74,7 @@ slug: /odoo16/web/form/form-controller
 | `displayButtons`（getter） | 渲染计算 | `indicatorMode !== "saved"` 时显示云朵保存/撤销按钮 |
 | `save()` / `discard()` | 点击按钮 | 调用从 Controller 传入的 `save/discard` 回调 |
 
-## 关键依赖（按重要度）
+## 关键依赖
 
 | 依赖 | 文件 | 级别 | 与本文件的关系 |
 | --- | --- | --- | --- |
@@ -87,16 +89,20 @@ slug: /odoo16/web/form/form-controller
 
 ---
 
-## 主流程（初始化到首屏）
+## 主流程
 
-### 1) 上游：View 组件如何把 `archInfo` 交给 FormController
+### 1) archInfo传递
+
+View 组件如何把 archInfo 交给 FormController
 
 `views/form/form_view.js` 注册了 `form` 视图描述，其中 `props()` 会执行：
 
 - `archInfo = new FormArchParser().parse(arch, relatedModels, resModel)`
 - 把 `Model/Renderer/Compiler/buttonTemplate/archInfo` 等注入给控制器组件（即 `FormController` 的 `props`）
 
-### 2) `FormController.setup()` 的关键设计：用 `beforeLoadProm` 串联“先子视图、后数据”
+### 2) FormController.setup
+
+用 `beforeLoadProm` 串联“先子视图、后数据”
 
 本文件里有两段必须严格排序的异步逻辑：
 
@@ -112,7 +118,9 @@ slug: /odoo16/web/form/form-controller
 
 ---
 
-## `loadSubViews()` 详解（x2many 子视图加载器）
+## `loadSubViews()` 详解
+
+> x2many 子视图加载器
 
 ### 输入与输出
 
@@ -126,7 +134,9 @@ slug: /odoo16/web/form/form-controller
   - 填充 `fieldInfo.views[viewType]`（解析后的 archInfo）
   - 填充 `fieldInfo.relatedFields`
 
-### 过滤规则（只处理“需要子视图”的 x2many）
+### 过滤规则
+
+只处理“需要子视图”的 x2many
 
 对每个 `fieldName`：
 
@@ -135,7 +145,9 @@ slug: /odoo16/web/form/form-controller
 3. `!fieldInfo.FieldComponent.useSubView` → 该字段组件不需要子视图（例如某些 widget）→ 跳过
 4. 已有 `fieldInfo.views[viewType]` → 说明子视图内联在 form arch 中 → 跳过
 
-### viewType 决策逻辑（tree→list，移动端倾向 kanban）
+### viewType 决策逻辑
+
+（tree→list，移动端倾向 kanban）
 
 - 默认 `fieldInfo.viewMode || "list,kanban"`
 - 把 `"tree"` 替换成 `"list"`（统一命名）
@@ -144,7 +156,9 @@ slug: /odoo16/web/form/form-controller
   - 非小屏：选 `"list"`
 - 最终写回 `fieldInfo.viewMode = viewType`
 
-### context 处理：把 `*_view_ref` 从 field context 拆出来
+### context 处理
+
+**把 `*_view_ref` 从 field context 拆出来**
 
 这里有一个非常“工程化”的处理：
 
@@ -209,7 +223,7 @@ slug: /odoo16/web/form/form-controller
 
 因此 `this.model.root` 是 `basic_relational_model.Record`，其 `save/urgentSave/askChanges/...` 语义请见下节。
 
-### 4) 对话框 footer 迁移（非常实用的细节）
+### 4) 对话框 footer 迁移
 
 当 form 在对话框中渲染时，需要把不是子视图内部的 `<footer>` 移到底部按钮区域：
 
@@ -222,7 +236,9 @@ slug: /odoo16/web/form/form-controller
 
 模板 `form_controller.xml` 中在 `env.inDialog` 且有 `footerArchInfo` 时，会让 `Renderer` 只渲 footer arch 到对话框 footer 槽位。
 
-### 5) 与 `FormRenderer` 的接口（由 `form_controller.xml` 绑定）
+### 5) 与 `FormRenderer` 的接口
+
+由 `form_controller.xml` 绑定。
 
 `FormController` 本身并不直接操作 DOM 来渲染表单内容，而是通过模板把“根记录 + archInfo + 一组回调”交给 `FormRenderer`。关键绑定点在 `form_controller.xml` 的两处 `t-component="props.Renderer"`：
 
@@ -245,7 +261,9 @@ slug: /odoo16/web/form/form-controller
   - `ViewButton.onClick()` 会把这两个回调作为 `disableAction/enableAction` 传给 `env.onClickViewButton(...)`（由 `useViewButtons()` 提供），从而在动作执行期间同步禁用/启用控制面板相关按钮。
 - `FormCompiler.compileNotebook()`：把 `defaultPage/onPageUpdate` 绑定到 `props.activeNotebookPages` 与 `props.onNotebookPageChange`，让 controller 能在 `getLocalState()` 中保存、下次恢复页签。
 
-### 5) View Buttons（表单 header/footer 内按钮的点击管线）
+### 5) View Buttons
+
+（表单 header/footer 内按钮的点击管线）
 
 `useViewButtons(this.model, rootRef, { beforeExecuteAction, afterExecuteAction })` 会在子环境注入 `onClickViewButton()`：
 
@@ -300,7 +318,7 @@ slug: /odoo16/web/form/form-controller
 
 ---
 
-## 与 `basic_relational_model.js` 的对接点（必须理解）
+## 与 `basic_relational_model.js` 的对接点
 
 `FormController` 使用的 `this.model.root`（Record）关键方法语义（摘自 `views/basic_relational_model.js`）：
 
@@ -337,7 +355,9 @@ slug: /odoo16/web/form/form-controller
 5. `useModel().onWillStart()` 等到 promise 后执行 `model.load()` 创建并加载 `root` record
 6. renderer 首次渲染
 
-### 点击保存（控制面板云朵 / footer Save）
+### 点击保存
+
+（控制面板云朵 / footer Save）
 
 1. `FormStatusIndicator.save()` → `FormController.saveButtonClicked()`
 2. `root.save()`（或 `props.saveRecord`）
@@ -367,7 +387,9 @@ slug: /odoo16/web/form/form-controller
 
 ---
 
-## 参考阅读（建议继续深挖的文件）
+## 参考阅读
+
+（建议继续深挖的文件）
 
 - `addons/web/static/src/views/form/form_controller.js`（本文）
 - `addons/web/static/src/views/form/form_controller.xml`（模板：Layout slots、ActionMenus、FormStatusIndicator、dialog footer renderer）
