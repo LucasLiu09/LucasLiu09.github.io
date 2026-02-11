@@ -1,7 +1,7 @@
 ---
 title: use External Libraries in odoo using OWL Javascript Framework
 description: use External Libraries in odoo using OWL Javascript Framework
-sidebar_label: OWL - use external libraries
+sidebar_label: Use external libraries
 keywords:
 - odoo
 - odoo development
