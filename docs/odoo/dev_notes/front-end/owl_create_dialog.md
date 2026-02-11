@@ -1,7 +1,7 @@
 ---
 title: OWL - Create a new Dialog
 description: 创建一个新的Dialog弹窗
-sidebar_label: OWL - Create a new Dialog
+sidebar_label: Create a new Dialog
 keyword:
     - odoo
     - odoo development
@@ -182,3 +182,4 @@ NewDialogExtends.template = "NewDialogExtends";
 ### 效果图
 
 ![3](../_images/owl_create_dialog_3.png)
+
