@@ -36,7 +36,9 @@ slug: /odoo16/web/form/form-renderer
 
 ---
 
-## `FormRenderer` 方法速查表
+## 方法速查表
+
+### FormRenderer
 
 | 方法/属性 | 触发时机/入口 | 逻辑简述 | 与 `FormController` 的关系 |
 | --- | --- | --- | --- |
@@ -45,7 +47,9 @@ slug: /odoo16/web/form/form-renderer
 | `evalDomainFromRecord(record, expr)` | 编译模板运行时调用 | `evalDomain(expr, record.evalContext)`；供编译器生成的 `t-if`/可见性判断使用 | 让 arch 中的 `modifiers`/domain 依赖 record 评估 |
 | `compileParams`（getter） | 传入 `useViewCompiler` | 当前返回 `{}`（为二开编译参数预留） | 若二开需影响编译结果，应考虑缓存粒度（rawArch + compiler 类） |
 
-## `FormCompiler` 关键方法速查表（决定“Form 是怎么被编译出来的”）
+### FormCompiler
+
+决定“Form 是怎么被编译出来的”
 
 | 方法 | 触发时机/入口 | 逻辑简述 | 与 Controller/Renderer 协作点 |
 | --- | --- | --- | --- |
@@ -58,7 +62,7 @@ slug: /odoo16/web/form/form-renderer
 | `compileGroup/compileSheet/compileForm/...` | 编译结构节点 | 把 legacy 结构（group/sheet/form）映射为 `OuterGroup/InnerGroup` 等组件与布局 class | 决定只读/编辑态 class（依赖 `props.record.isInEdition`） |
 | `compileWidget(el)` | 编译 `<widget>` | 生成 `<Widget readonly="!props.record.isInEdition"/>` | 只读/编辑态由 record 决定，与 Controller 的 `switchMode` 联动 |
 
-## 关键依赖（按重要度）
+## 关键依赖
 
 | 依赖 | 文件 | 级别 | 与本组件关系 |
 | --- | --- | --- | --- |
@@ -71,9 +75,13 @@ slug: /odoo16/web/form/form-renderer
 
 ---
 
-## `FormRenderer`：编译-渲染流水线
+## `FormRenderer`
 
-### 1) 输入数据（由 `FormController` 提供）
+编译-渲染流水线
+
+### 1) 输入数据
+
+（由 `FormController` 提供）
 
 `FormRenderer` 的关键 props（来自 `form_controller.xml`）：
 
@@ -87,7 +95,9 @@ slug: /odoo16/web/form/form-renderer
 
 > 注意：`FormRenderer` 文件本身几乎不直接调用这些回调；它更多是“容器”，真正把回调下发到字段/按钮/notebook 的工作由 `FormCompiler` 完成。
 
-### 2) 编译模板：`useViewCompiler()`
+### 2) 编译模板
+
+**`useViewCompiler()`**
 
 在 `setup()` 中：
 
@@ -100,7 +110,9 @@ slug: /odoo16/web/form/form-renderer
 
 因此渲染过程就是：**运行编译后的模板，并在模板里引用 `props.record/props.archInfo/...`**。
 
-### 3) 编译结果如何拿到 DOM 引用：`compiled_view_root`
+### 3) 编译结果如何拿到 DOM 引用
+
+**`compiled_view_root`**
 
 `FormCompiler.compile()` 会把编译后的根节点设置：
 
@@ -113,7 +125,11 @@ slug: /odoo16/web/form/form-renderer
 
 ---
 
-## 运行时行为：resize / autofocus / bounce
+## 运行时行为
+
+- resize
+- autofocus
+- bounce
 
 ### resize 重渲染
 
@@ -144,9 +160,11 @@ slug: /odoo16/web/form/form-renderer
 
 ---
 
-## `FormCompiler` 如何把 Renderer/Controller 串起来（关键逻辑）
+## `FormCompiler` 如何把 Renderer/Controller 串起来
 
-### 1) 字段脏态上报：`Field` ←→ `FormController.state.fieldIsDirty`
+### 1) 字段脏态上报
+
+**`Field` ←→ `FormController.state.fieldIsDirty`**
 
 `FormCompiler.compileField()` 注入：
 
@@ -161,7 +179,9 @@ slug: /odoo16/web/form/form-renderer
 
 这解决的是一个常见 UX 问题：**有些输入状态尚未进入 record 的正式变更集（`record.isDirty`），但用户已经在字段里修改了内容**。
 
-### 2) 视图按钮执行期禁用：`ViewButton` ←→ `useViewButtons()` ←→ Controller
+### 2) 视图按钮执行期禁用
+
+**`ViewButton` ←→ `useViewButtons()` ←→ Controller**
 
 `FormCompiler.compileButton()` 覆盖 `ViewCompiler.compileButton()` 的结果，额外注入：
 
@@ -184,7 +204,9 @@ slug: /odoo16/web/form/form-renderer
 
 这就是为什么 `form_controller.xml` 里会把 `enableViewButtons/disableViewButtons` 绑定到 Controller：它让“动作执行期 UI 禁用”在 **编译模板生成的按钮** 与 **控制面板按钮/状态指示器** 之间保持一致。
 
-### 3) Notebook 页签状态持久化：Renderer props ←→ Controller localState
+### 3) Notebook 页签状态持久化
+
+**Renderer props ←→ Controller localState**
 
 `FormCompiler.compileNotebook()` 注入：
 
