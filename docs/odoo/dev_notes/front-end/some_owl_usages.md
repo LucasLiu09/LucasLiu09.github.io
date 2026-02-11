@@ -1,7 +1,7 @@
 ---
-title: 一些Owl的说明
-description: OWL - A web framework for structured, dynamic and maintainable applications.
-sidebar_label: 一些Owl的说明
+title: Slots - 插槽
+description: OWL - Slots
+sidebar_label: Slots
 keywords:
 - docs
 - odoo development
@@ -9,13 +9,11 @@ tags: [odoo]
 
 ---
 
-# 一些Owl的说明
-
-## slots
+# Slots
 
 对于通用组件，通常来说会包含一些可自定义的内容，而具体内容是由该通用组件的父组件来指定。这正是slot的工作方式。
 
-### Named slots<!-- {docsify-ignore} -->
+## Named slots<!-- {docsify-ignore} -->
 
 通过`t-slot`指令定义.
 
@@ -44,7 +42,7 @@ tags: [odoo]
 </InfoBox>
 ```
 
-### Default Slot<!-- {docsify-ignore} -->
+## Default Slot<!-- {docsify-ignore} -->
 
 组件内所有非命名Slot的元素都将被视为 `default` Slot内容的一部分。
 
@@ -79,7 +77,7 @@ Default content
 <!-- will be rendered as: <div><span>default content</span></div> -->
 ```
 
-### slots and props<!-- {docsify-ignore} -->
+## slots and props<!-- {docsify-ignore} -->
 
 从某种意义上说，**slots** 几乎与 **props** 相同：它们定义了一些要传递给子组件的信息。为了能够使用这些信息并将其传递给子组件，Owl 实际上定义了一个特殊的 **prop** `slots` ，其中包含传递给组件的所有 slot 信息。它看起来像这样：
 
@@ -93,7 +91,7 @@ Default content
 <Child slots="props.slots"/>
 ```
 
-### 动态slots<!-- {docsify-ignore} -->
+## 动态slots<!-- {docsify-ignore} -->
 
 对于高级用例，可能需要向 slot 传递额外的信息。这可以通过向 `t-set-slot` 提供额外的键/值对来实现。然后，通用组件可以在其 prop `slots` 中读取它们。
 例如，下面是如何实现 Notebook 组件（一个具有多个页面和一个标签栏的组件，它仅呈现当前活动页面，并且每个页面都有一个标题）。
@@ -140,7 +138,7 @@ class Notebook extends Component {
 
 Slot params 的工作方式与普通 props 类似，因此可以使用 `.translate` 之类的后缀 当 prop 是面向用户的字符串并且应该被翻译时，或者在需要时使用 `.bind` 来绑定函数。
 
-### Slot scopes<!-- {docsify-ignore} -->
+## Slot scopes<!-- {docsify-ignore} -->
 
 通常slot都有父组件传递内容给通用组件，反之在父组件定义slot时可以访问子组件提供的内容。此时就需要用到`t-slot-scope`来定义一个变量的名称，该变量可以访问子组件提供的所有内容。
 需要将`t-slot-scope`与`t-set-slot`结合使用：
