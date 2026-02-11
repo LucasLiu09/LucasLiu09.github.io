@@ -4,17 +4,17 @@ title: Odoo 16 FormController 源码解析
 sidebar_label: FormController
 description: Odoo 16 Web 表单视图 FormController（含与 FormRenderer/FormCompiler 协作接口、子视图加载、保存/离开保护、动作菜单与按钮执行链路）源码梳理。
 tags:
-  - odoo16
+  - odoo
   - odoo-web
   - odoo-controller
 slug: /odoo16/web/form/form-controller
 ---
 
+# Odoo 16 FormController 源码解析
+
 :::tip
 本文由AI生成+人工校正。
 :::
-
-# Odoo 16 FormController 源码解析
 
 ## 总览
 
