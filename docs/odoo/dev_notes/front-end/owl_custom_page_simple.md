@@ -1,7 +1,7 @@
 ---
-title: OWL - 自定义界面
-description: OWL - 自定义界面
-sidebar_label: OWL - 自定义界面
+title: OWL - 自定义页面
+description: OWL - 自定义页面
+sidebar_label: 自定义页面
 keyword:
     - odoo
     - odoo development
@@ -11,7 +11,7 @@ last_update:
   author: Lucas
 ---
 
-#  OWL - 自定义界面
+#  自定义界面
 
 :::info[Note]
 
@@ -125,5 +125,6 @@ registry.category("actions").add('new_component', NewComponent);
 ```
 
 ## 截图
+
 
 ![](../_images/owl_custom_page_simple_1.png)
