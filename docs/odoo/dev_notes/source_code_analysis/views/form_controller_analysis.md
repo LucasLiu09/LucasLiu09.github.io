@@ -76,16 +76,16 @@ slug: /odoo16/web/form/form-controller
 
 ## 关键依赖
 
-| 依赖 | 文件 | 级别 | 与本文件的关系 |
-| --- | --- | --- | --- |
-| `viewService.loadViews` | `addons/web/static/src/views/view_service.js` | 一级必读 | `loadSubViews()` 通过它调用服务端 `get_views` 拉取子视图描述（arch、fields、relatedModels）并带缓存 |
-| `useModel()` | `addons/web/static/src/views/model.js` | 一级必读 | 解释 `beforeLoadProm` 的原因：要先完成子视图加载，再执行 model.load（否则 fieldsInfo 不完整） |
-| `RelationalModel/Record`（表单用） | `addons/web/static/src/views/basic_relational_model.js` | 一级必读 | `FormController` 调用的 `root.save/urgentSave/askChanges/archive/delete/duplicate/discard/switchMode` 都在这里实现（桥接 legacy BasicModel） |
-| `useViewButtons()` | `addons/web/static/src/views/view_button/view_button_hook.js` | 一级必读 | 统一处理  `<button type="object/action">`  的点击：禁用按钮→可选确认→ `action.doActionButton` → onClose reload |
-| `useSetupView()` | `addons/web/static/src/views/view_hook.js` | 一级必读 | `beforeLeave/beforeUnload/getLocalState` 的挂载入口（实际转交给 action hook 体系） |
-| `FormArchParser` | `addons/web/static/src/views/form/form_arch_parser.js` | 一级必读 | 生成 `archInfo.activeFields`；`loadSubViews()` 依赖其中的 `FieldComponent/useSubView/modifiers/context/views/viewMode` 等字段 |
-| `makeContext()` | `addons/web/static/src/core/context.js` | 二级选读 | 合并（并可 evaluate）多段 context，用于 `loadViews()` 请求子视图 |
-| `views registry` | `addons/web/static/src/views/*/*_view.js` | 二级选读 | `loadSubViews()` 用 `viewRegistry.get(viewType).ArchParser` 解析子视图 arch（list/kanban） |
+| 依赖 | 文件| 与本文件的关系 |
+| --- | --- | --- |
+| `viewService.loadViews` | `addons/web/static/src/views/view_service.js` | `loadSubViews()` 通过它调用服务端 `get_views` 拉取子视图描述（arch、fields、relatedModels）并带缓存 |
+| `useModel()` | `addons/web/static/src/views/model.js` | 解释 `beforeLoadProm` 的原因：要先完成子视图加载，再执行 model.load（否则 fieldsInfo 不完整） |
+| `RelationalModel/Record`（表单用） | `addons/web/static/src/views/basic_relational_model.js` | `FormController` 调用的 `root.save/urgentSave/askChanges/archive/delete/duplicate/discard/switchMode` 都在这里实现（桥接 legacy BasicModel） |
+| `useViewButtons()` | `addons/web/static/src/views/view_button/view_button_hook.js` | 统一处理  `<button type="object/action">`  的点击：禁用按钮→可选确认→ `action.doActionButton` → onClose reload |
+| `useSetupView()` | `addons/web/static/src/views/view_hook.js` | `beforeLeave/beforeUnload/getLocalState` 的挂载入口（实际转交给 action hook 体系） |
+| `FormArchParser` | `addons/web/static/src/views/form/form_arch_parser.js` | 生成 `archInfo.activeFields`；`loadSubViews()` 依赖其中的 `FieldComponent/useSubView/modifiers/context/views/viewMode` 等字段 |
+| `makeContext()` | `addons/web/static/src/core/context.js` | 合并（并可 evaluate）多段 context，用于 `loadViews()` 请求子视图 |
+| `views registry` | `addons/web/static/src/views/*/*_view.js` | `loadSubViews()` 用 `viewRegistry.get(viewType).ArchParser` 解析子视图 arch（list/kanban） |
 
 ---
 
