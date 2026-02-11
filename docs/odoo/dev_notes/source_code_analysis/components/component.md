@@ -15,6 +15,6 @@ last_update:
 
 ## 生命周期
 
-![component lifecycle](/odoo/dev_notes/_images/component_lifecycle.svg)
+![component lifecycle](/docs/odoo/dev_notes/_images/component_lifecycle.svg)
 
 > 图片来源于[Odoo documentation - 01_owl_components](https://www.odoo.com/documentation/18.0/zh_CN/developer/tutorials/discover_js_framework/01_owl_components.html#theory-component-lifecycle-and-hooks).
