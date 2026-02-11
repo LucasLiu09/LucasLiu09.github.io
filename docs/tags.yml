@@ -5,12 +5,12 @@ odoo:
 
 odoo-web:
   label: 'Odoo Web'
-  permalink: '/odoo'
+  permalink: '/odoo-web'
   description: 'Odoo - Web'
 
 odoo-controller:
   label: 'Odoo Controller'
-  permalink: '/odoo'
+  permalink: '/odoo-controller'
   description: 'Odoo - Controller'
 
 projectManager:
