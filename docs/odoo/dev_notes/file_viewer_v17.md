@@ -45,6 +45,7 @@ this.store.Attachment.insert({
 
 :::tip[用法示例]
 [GitHub - many2many_binary_field_preview](https://github.com/LucasLiu09/many2many_binary_field_preview/tree/main)
+
 [GitHub - many2many_binary_field_preview_patch_v18](https://github.com/LucasLiu09/odoo18-custom-addons/blob/main/files_preview/static/src/many2many_binary_preview_patch/many2many_binary_preview_patch.js)
 :::
 
