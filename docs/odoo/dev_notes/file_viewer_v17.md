@@ -1,20 +1,20 @@
 ---
-title: 文件预览 - fileViewer(Odoo17)
-description: fileViewer(Odoo17)
-sidebar_label: 文件预览 - fileViewer(Odoo17)
+title: 文件预览 - fileViewer(Odoo17、18)
+description: fileViewer(Odoo17、18)
+sidebar_label: 文件预览 - fileViewer(Odoo17、18)
 keyword:
     - odoo
     - odoo development
 tags: [odoo]
 last_update:
-  date: 2025/5/21
+  date: 2026/3/30
   author: Lucas
 ---
 
-# 文件预览 - fileViewer(Odoo17)
+# 文件预览 - fileViewer(Odoo17、18)
 
 :::info[Note]
-Odoo17 原生组件`FileViewer`，支持预览图片、视频、音频、pdf、txt等文件。
+Odoo17、18 原生组件`FileViewer`，支持预览图片、视频、音频、pdf、txt等文件。
 :::
 
 系统自带的场景为oe_chatter侧栏中的附件(`Component:AttachmentList`)，可单击预览。
@@ -25,10 +25,27 @@ Hook: `useFileViewer`
 
 ```javascript
 import { useFileViewer } from "@web/core/file_viewer/file_viewer_hook";
+import { FileModel } from "@web/core/file_viewer/file_model";
+
+// 方式一：
+// FileViewer通常结合FileModel使用。
+// FileViewer.props.files期望的一些元素在FileModel中均有定义。
+
+// 方式二：
+// 也可以通过service：mail.store; 例如：addons\product\static\src\js\product_document_kanban\product_document_kanban_record.js
+// 但是这个方式必须depends mail模块。
+this.store = useService("mail.store");
+this.store.Attachment.insert({
+    id: f.id,
+    filename: f.name,
+    name: this.props.name,
+    mimetype: f.mimetype,
+})
 ```
 
 :::tip[用法示例]
 [GitHub - many2many_binary_field_preview](https://github.com/LucasLiu09/many2many_binary_field_preview/tree/main)
+[GitHub - many2many_binary_field_preview_patch_v18](https://github.com/LucasLiu09/odoo18-custom-addons/blob/main/files_preview/static/src/many2many_binary_preview_patch/many2many_binary_preview_patch.js)
 :::
 
 **源码**
