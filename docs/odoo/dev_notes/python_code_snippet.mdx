@@ -27,7 +27,8 @@ import TabItem from '@theme/TabItem';
 import pytz
 import datetime
 
-def serialize_datetime(self, input_datetime, source_tz_name=""):
+
+def serialize_datetime(input_datetime, source_tz_name=""):
     """
     将输入的datetime对象转换为UTC时区下的datetime对象
     Args:
@@ -38,28 +39,60 @@ def serialize_datetime(self, input_datetime, source_tz_name=""):
     """
     if not source_tz_name:
         source_tz_name = "UTC"
-    return self.convert_datetime_timezone(input_datetime, source_tz_name, "UTC")
+    utc_datetime = convert_datetime_timezone(input_datetime, source_tz_name, "UTC", rm_tzinfo=True)
+    return utc_datetime
 
-def convert_datetime_timezone(self, input_datetime, source_tz_name="UTC", target_tz_name="UTC"):
+
+def convert_datetime_timezone(input_datetime, source_tz_name="UTC", target_tz_name="UTC", rm_tzinfo=False):
     """
     将输入的datetime对象转换为目标时区下的datetime对象
     Args:
         input_datetime: 输入的datetime对象
         source_tz_name: 源时区名称
         target_tz_name: 目标时区名称
+        rm_tzinfo: 返回结果是否移除时区信息
     Returns:
         datetime对象
     """
-    
     # 仅处理 datetime 对象；空值或其他类型保持原样返回。
     if not input_datetime or not isinstance(input_datetime, datetime.datetime):
         return input_datetime
     source_tz = pytz.timezone(source_tz_name or "UTC")
     target_tz = pytz.timezone(target_tz_name or "UTC")
     # 将传入的 datetime 视为源时区的本地时间。
-    source_datetime = source_tz.localize(input_datetime)
+    if input_datetime.tzinfo:   # 如果输入的datetime对象有时区信息，则先转换为naive datetime对象
+        input_datetime = input_datetime.replace(tzinfo=None)
+    source_datetime = source_tz.localize(input_datetime, is_dst=False)  # UTC = no DST
     # 返回目标时区下的 datetime，便于继续按 Odoo Datetime 习惯处理。
-    return source_datetime.astimezone(target_tz).replace(tzinfo=None)
+    if rm_tzinfo:
+        return source_datetime.astimezone(target_tz).replace(tzinfo=None)
+    else:
+        return source_datetime.astimezone(target_tz)
+
+def get_today_by_timezone(tz_name="UTC", timestamp=None):
+    """
+    获取指定时区下的当天日期。
+    Args:
+        tz_name: 目标时区名称
+        timestamp: 可选的基准 datetime，默认为当前 UTC 时间; 该时间点需要是UTC时间。
+    Returns:
+        date对象
+    """
+    today = timestamp or datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    target_tz = pytz.timezone(tz_name or "UTC")
+    today_utc = pytz.timezone("UTC").localize(today, is_dst=False)  # UTC = no DST
+    return today_utc.astimezone(target_tz).date()
+
+# 使用示例: 将指定时区的早上八点钟转换为utc时区的naive datetime
+def test_timezone(self):
+    tz_name = "Asia/Hong_Kong"
+    tz = pytz.timezone(tz_name)
+    today = get_today_by_timezone(tz_name)
+    # 指定时区当地时间的早上8点
+    local_m8 = tz.localize(datetime.datetime.combine(today, datetime.time(8,0,0)))
+    utc_time = utils.serialize_datetime(input_datetime=local_m8, source_tz_name=tz_name)
+    raise ValidationError(f"localtime: {local_m8}, utc_time: {utc_time}")
+
 ```
 
 ## 字符串基于UTF-8字节数切片
