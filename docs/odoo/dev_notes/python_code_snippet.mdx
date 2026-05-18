@@ -20,6 +20,48 @@ import TabItem from '@theme/TabItem';
 记录Python的一些常用方法的代码片段及其解析。
 :::
 
+## 转换datetime的时区
+
+```python
+
+import pytz
+import datetime
+
+def serialize_datetime(self, input_datetime, source_tz_name=""):
+    """
+    将输入的datetime对象转换为UTC时区下的datetime对象
+    Args:
+        input_datetime: 输入的datetime对象
+        source_tz_name: 源时区名称
+    Returns:
+        datetime对象
+    """
+    if not source_tz_name:
+        source_tz_name = "UTC"
+    return self.convert_datetime_timezone(input_datetime, source_tz_name, "UTC")
+
+def convert_datetime_timezone(self, input_datetime, source_tz_name="UTC", target_tz_name="UTC"):
+    """
+    将输入的datetime对象转换为目标时区下的datetime对象
+    Args:
+        input_datetime: 输入的datetime对象
+        source_tz_name: 源时区名称
+        target_tz_name: 目标时区名称
+    Returns:
+        datetime对象
+    """
+    
+    # 仅处理 datetime 对象；空值或其他类型保持原样返回。
+    if not input_datetime or not isinstance(input_datetime, datetime.datetime):
+        return input_datetime
+    source_tz = pytz.timezone(source_tz_name or "UTC")
+    target_tz = pytz.timezone(target_tz_name or "UTC")
+    # 将传入的 datetime 视为源时区的本地时间。
+    source_datetime = source_tz.localize(input_datetime)
+    # 返回目标时区下的 datetime，便于继续按 Odoo Datetime 习惯处理。
+    return source_datetime.astimezone(target_tz).replace(tzinfo=None)
+```
+
 ## 字符串基于UTF-8字节数切片
 
 ```python
