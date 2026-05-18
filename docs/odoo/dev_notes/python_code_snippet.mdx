@@ -57,17 +57,24 @@ def convert_datetime_timezone(input_datetime, source_tz_name="UTC", target_tz_na
     # 仅处理 datetime 对象；空值或其他类型保持原样返回。
     if not input_datetime or not isinstance(input_datetime, datetime.datetime):
         return input_datetime
-    source_tz = pytz.timezone(source_tz_name or "UTC")
-    target_tz = pytz.timezone(target_tz_name or "UTC")
-    # 将传入的 datetime 视为源时区的本地时间。
-    if input_datetime.tzinfo:   # 如果输入的datetime对象有时区信息，则先转换为naive datetime对象
-        input_datetime = input_datetime.replace(tzinfo=None)
-    source_datetime = source_tz.localize(input_datetime, is_dst=False)  # UTC = no DST
-    # 返回目标时区下的 datetime，便于继续按 Odoo Datetime 习惯处理。
-    if rm_tzinfo:
-        return source_datetime.astimezone(target_tz).replace(tzinfo=None)
-    else:
-        return source_datetime.astimezone(target_tz)
+    
+    try:
+        source_tz = pytz.timezone(source_tz_name or "UTC")
+        target_tz = pytz.timezone(target_tz_name or "UTC")
+    except pytz.UnknownTimeZoneError as e:
+        raise     # UserError(_("无效的时区名称: %s") % e)
+
+    try:
+        # 将传入的 datetime 视为源时区的本地时间。
+        if input_datetime.tzinfo:
+            source_datetime = input_datetime.astimezone(source_tz)
+        else:
+            source_datetime = source_tz.localize(input_datetime, is_dst=False)  # UTC = no DST
+        # 转换为目标时区的datetime
+        target_datetime = source_datetime.astimezone(target_tz)
+        return target_datetime.replace(tzinfo=None) if rm_tzinfo else target_datetime
+    except Exception as e:
+        raise     # UserError(_("时区转换失败: %s") % e)
 
 def get_today_by_timezone(tz_name="UTC", timestamp=None):
     """
@@ -79,9 +86,16 @@ def get_today_by_timezone(tz_name="UTC", timestamp=None):
         date对象
     """
     today = timestamp or datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
-    target_tz = pytz.timezone(tz_name or "UTC")
-    today_utc = pytz.timezone("UTC").localize(today, is_dst=False)  # UTC = no DST
-    return today_utc.astimezone(target_tz).date()
+    try:
+        target_tz = pytz.timezone(tz_name or "UTC")
+        if today.tzinfo:
+            today_utc = today.astimezone(pytz.UTC)
+        else:
+            today_utc = pytz.UTC.localize(today, is_dst=False)
+        return today_utc.astimezone(target_tz).date()
+    except Exception:
+        # _logger.debug("failed to compute timezone-specific today date, using UTC value", exc_info=True)
+        return today.date()
 
 # 使用示例: 将指定时区的早上八点钟转换为utc时区的naive datetime
 def test_timezone(self):
