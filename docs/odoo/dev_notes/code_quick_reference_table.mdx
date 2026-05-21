@@ -312,3 +312,58 @@ def create_index(cr, indexname, tablename, expressions, method='btree', where=''
 ### 一些html/css/js
 
 - 转圈icon：`<i class="fa fa-spinner fa-spin"/>`
+
+## SQL
+
+### Odoo群组
+
+#### 查询指定群组的用户名、login
+
+```sql
+-- 查询指定群组的用户名、login
+SELECT
+    u.id AS user_id,
+    p.name AS name,
+    u.login AS login
+FROM ir_model_data imd
+JOIN res_groups_users_rel rel ON rel.gid = imd.res_id
+JOIN res_users u ON u.id = rel.uid
+JOIN res_partner p ON p.id = u.partner_id
+WHERE imd.module = '<module>'
+  AND imd.name = '<group_xml_id>'
+  AND imd.model = 'res.groups'
+  and u.active = true
+ORDER BY p.name, u.login;
+```
+
+#### 复制群组的所有用户到指定群组
+
+```sql
+-- 从一个群组copy所有用户到另一个群组
+WITH source_group AS (
+    SELECT res_id AS gid
+    FROM ir_model_data
+    WHERE module = '<module>'
+      AND name = '<source_group_xml_id>'
+      AND model = 'res.groups'
+),
+target_group AS (
+    SELECT res_id AS gid
+    FROM ir_model_data
+    WHERE module = '<module>'
+      AND name = '<target_group_xml_id>'
+      AND model = 'res.groups'
+)
+INSERT INTO res_groups_users_rel (gid, uid)
+SELECT target_group.gid, rel.uid
+FROM res_groups_users_rel rel
+JOIN source_group ON rel.gid = source_group.gid
+CROSS JOIN target_group
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM res_groups_users_rel existing
+    WHERE existing.gid = target_group.gid
+      AND existing.uid = rel.uid
+)
+RETURNING uid;
+```
