@@ -334,6 +334,19 @@ WHERE imd.module = '<module>'
   AND imd.model = 'res.groups'
   and u.active = true
 ORDER BY p.name, u.login;
+
+-- 通过群组名称查询
+SELECT
+    u.id AS user_id,
+    p.name AS name,
+    u.login AS login
+FROM res_groups g
+JOIN res_groups_users_rel rel ON rel.gid = g.id
+JOIN res_users u ON u.id = rel.uid
+JOIN res_partner p ON p.id = u.partner_id
+WHERE g.name->>'en_US' = '<group name>'	-- zh_CN
+  AND u.active = true
+ORDER BY p.name, u.login;
 ```
 
 #### 复制群组的所有用户到指定群组
