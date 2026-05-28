@@ -63,6 +63,7 @@ const sidebars = {
             'odoo/dev_notes/models/create_database_view',
             'odoo/dev_notes/models/onchange_set_context',
             'odoo/dev_notes/models/model_access',
+            'odoo/dev_notes/models/many2one_domain_string_resolution',
           ]
         },
         {
