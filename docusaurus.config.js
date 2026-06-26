@@ -100,7 +100,7 @@ const config = {
             type: 'docSidebar',
             sidebarId: 'generativeAISidebar',
             position: 'right',
-            label: 'talk about AI',
+            label: 'Talk about AI',
           },
           {
             type: 'docSidebar',
