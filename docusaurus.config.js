@@ -92,32 +92,32 @@ const config = {
         items: [
           {
             type: 'docSidebar',
-            sidebarId: 'tutorialSidebar',
-            position: 'right',
-            label: 'Docusaurus',
-          },
-          {
-            type: 'docSidebar',
             sidebarId: 'odooSidebar',
             position: 'right',
             label: 'Odoo',
           },
           {
             type: 'docSidebar',
-            sidebarId: 'projectManagerSidebar',
+            sidebarId: 'generativeAISidebar',
             position: 'right',
-            label: '项目管理',
+            label: 'talk about AI',
           },
           {
             type: 'docSidebar',
-            sidebarId: 'generativeAISidebar',
+            sidebarId: 'projectManagerSidebar',
             position: 'right',
-            label: 'Generative AI',
+            label: 'Project Management',
           },
           {
             href: 'https://github.com/LucasLiu09/LucasLiu09.github.io',
             label: 'GitHub',
             position: 'right',
+          },
+          {
+            type: 'docSidebar',
+            sidebarId: 'tutorialSidebar',
+            position: 'right',
+            label: 'Docusaurus',
           },
         ],
       },
@@ -136,7 +136,7 @@ const config = {
                 to: 'docs/odoo',
               },
               {
-                label: '项目管理',
+                label: 'Project Management',
                 to: 'docs/project_manager',
               },
             ],
