@@ -25,3 +25,5 @@ tags: [GenAI]
   - GSAP（GreenSock动画平台）官方AI技能。
   - 它们教授代理正确使用GSAP的方法：核心API、时间轴、ScrollTrigger、插件、React/Vue/Svelte、原生JavaScript以及性能优化。
   - 采用代理技能格式，兼容技能CLI（Cursor、Claude Code、Codex、Windsurf、Copilot、40多个代理）。
+- [ponytail](https://github.com/DietrichGebert/ponytail)
+  - 代码量减少 54%（最高可达 94%）· 成本降低 20% · 速度提升 27% · 100% 安全
