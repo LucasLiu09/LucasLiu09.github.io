@@ -119,6 +119,11 @@ const config = {
             position: 'right',
             label: 'Docusaurus',
           },
+          {
+            href: 'https://www.gov.cn/yaowen/liebiao/202603/content_7062633.htm',
+            label: '《十五五规划纲要》',
+            position: 'left',
+          },
         ],
       },
       footer: {
@@ -157,6 +162,10 @@ const config = {
                 label: 'GitHub',
                 href: 'https://github.com/LucasLiu09',
               },
+              {
+                label: '引用：《十五五规划纲要》- PDF',
+                href: 'https://www.ndrc.gov.cn/fggz/fzzlgh/gjfzgh/202603/U020260317369114704096.pdf',
+              }
             ],
           },
         ],
