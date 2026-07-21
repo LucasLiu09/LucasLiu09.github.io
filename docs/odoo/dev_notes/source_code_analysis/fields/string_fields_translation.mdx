@@ -177,7 +177,7 @@ record.update_field_translations(
 
 `TranslationButton` 只在系统启用多语言时显示。用户点击按钮后，`useTranslationDialog()` 创建翻译弹窗。
 
-若当前记录尚未保存，前端会先执行：
+打开翻译弹窗不会普遍保存表单；仅当记录尚未创建、没有 resId 时，才提示用户并在确认后先保存(调用`record.save(...)`)。已有记录直接打开弹窗，并加载表单尚未提交的最新值。
 
 ```javascript
 record.save({ stayInEdition: true })
