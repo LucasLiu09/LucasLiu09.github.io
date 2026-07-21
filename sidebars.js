@@ -79,6 +79,7 @@ const sidebars = {
                     'odoo/dev_notes/source_code_analysis/fields/selection_field_analysis',
                     'odoo/dev_notes/source_code_analysis/fields/x2many_field_analysis',
                     'odoo/dev_notes/source_code_analysis/fields/preloadedData',
+                    'odoo/dev_notes/source_code_analysis/fields/string_fields_translation',
                 ]
             },
             {
