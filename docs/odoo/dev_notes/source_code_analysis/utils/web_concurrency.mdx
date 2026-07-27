@@ -14,9 +14,9 @@ last_update:
 Odoo 16 Concurrency 并发原语源码解析（KeepLast / Mutex / Race）
 :::
 
-# KeepLast
+## KeepLast
 
-## 总览
+### 总览
 
 `KeepLast` 定义于 `addons/web/static/src/core/utils/concurrency.js`，是 Odoo 16 Web 客户端中的**并发原语**：管理一组异步任务，但**只保留最后一个任务的结果生效**。
 
@@ -32,7 +32,7 @@ Odoo 16 Concurrency 并发原语源码解析（KeepLast / Mutex / Race）
 
 ---
 
-## 类概览
+### 类概览
 
 | 项目 | 说明 |
 | --- | --- |
@@ -45,7 +45,7 @@ Odoo 16 Concurrency 并发原语源码解析（KeepLast / Mutex / Race）
 
 ---
 
-## 源码解释
+### 源码解释
 
 ```7:36:addons/web/static/src/core/utils/concurrency.js
 export class KeepLast {
@@ -80,13 +80,13 @@ export class KeepLast {
 }
 ```
 
-### 状态：`_id`
+#### 状态：`_id`
 
 - 构造时为 `0`。
 - 每次 `add` 先 `this._id++`，再把当前值闭包为 `currentId`。
 - `_id` 表示“世代”：更大的 `_id` 代表更新的任务；旧任务的 `currentId` 不再等于 `this._id`。
 
-### 方法：`add(promise)`
+#### 方法：`add(promise)`
 
 1. **登记新任务**：递增 `_id`，记下本任务的 `currentId`。
 2. **返回包装 Promise**：调用方 `await`/`then` 的是这个新 Promise，而不是原始 `promise`。
@@ -95,7 +95,7 @@ export class KeepLast {
    - 原始 Promise **失败**且仍是最新 → `reject(reason)`。
    - 若期间又调用了 `add`，`this._id` 已变大 → **既不 resolve 也不 reject**（该包装 Promise 永远挂起）。
 
-### 关键行为（与单元测试一致）
+#### 关键行为（与单元测试一致）
 
 测试见 `addons/web/static/tests/core/utils/concurrency_tests.js`：
 
@@ -107,7 +107,7 @@ export class KeepLast {
 | 同上，再 resolve def2 | 只有 def2 的 then 执行 |
 | 先 resolve def2，再 resolve def1 | 同样只有 def2 生效；def1 被丢弃 |
 
-### 边界与注意事项
+#### 边界与注意事项
 
 1. **不取消 RPC/网络请求**  
    旧 Promise 仍会跑完；`KeepLast` 只屏蔽结果。带宽与服务端负载仍在，只是 UI/状态不会被旧结果污染。
@@ -123,7 +123,7 @@ export class KeepLast {
 
 ---
 
-## 功能说明
+### 功能说明
 
 一句话：**在并发完成的异步任务中，只让“最后登记”的那一次结果生效。**
 
@@ -140,9 +140,9 @@ export class KeepLast {
 
 ---
 
-## 使用用途（项目中的典型场景）
+### 使用用途（项目中的典型场景）
 
-### 1. Action 服务：连续 doAction / 切视图 / 恢复面包屑
+#### 1. Action 服务：连续 doAction / 切视图 / 恢复面包屑
 
 `action_service.js` 在 ActionManager 内维护**单例** `keepLast`，包裹：
 
@@ -152,15 +152,15 @@ export class KeepLast {
 
 目的：用户连点菜单、快速切换 Action 时，只让最后一次导航相关异步结果继续往下执行，避免旧 Action 抢占控制器栈。
 
-### 2. 搜索栏：展开字段时的子项异步计算
+#### 2. 搜索栏：展开字段时的子项异步计算
 
 `search_bar.js`：用户改 query / 展开搜索项时，`computeState` 用 `keepLast.add(Promise.all(...))`。只应用最后一次输入对应的子项结果，避免下拉建议闪回。
 
-### 3. 命令面板：多 Provider 并行搜索
+#### 3. 命令面板：多 Provider 并行搜索
 
 `command_palette.js`：输入变化时对各 provider `Promise.all`，再 `keepLast.add`。只展示最后一次搜索词的命令列表。
 
-### 4. View / Model：加载与刷新
+#### 4. View / Model：加载与刷新
 
 | 位置 | 用法 |
 | --- | --- |
@@ -169,15 +169,15 @@ export class KeepLast {
 | `calendar_model.js` / `graph_model.js` / `pivot_model.js` | 数据刷新只保留最新一次 |
 | `kanban_model.js` | `tooltipKeepLast` 专门管 tooltip 的 read，避免悬停切换时旧 tooltip 覆盖新的 |
 
-### 5. Action 链接点击协调
+#### 5. Action 链接点击协调
 
 `view_hook.js` 的 `useActionLinks` 要求 `env.keepLast` 存在，用 `keepLast.add(orm.call(...))` / `keepLast.add(doAction(...))` 协调 onboarding banner 等链接的连续点击。
 
 ---
 
-## 使用方法
+### 使用方法
 
-### 基本写法
+#### 基本写法
 
 ```js
 import { KeepLast } from "@web/core/utils/concurrency";
@@ -195,7 +195,7 @@ class MyComponent extends Component {
 }
 ```
 
-### 与 Mutex 组合
+#### 与 Mutex 组合
 
 需要“只关心最新一次加载”，同时又要“同一时刻写状态不交错”时：
 
@@ -205,7 +205,7 @@ await this.keepLast.add(this.mutex.exec(() => record.load()));
 
 `relational_model` 创建记录时即采用这种模式：`KeepLast` 丢弃过期加载，`Mutex` 保证加载内的临界区串行。
 
-### 放入 Owl 环境供子树共享
+#### 放入 Owl 环境供子树共享
 
 ```js
 useSubEnv({
@@ -217,7 +217,7 @@ const keepLast = useComponent().env.keepLast;
 await keepLast.add(doAction(...));
 ```
 
-### 推荐与不推荐
+#### 推荐与不推荐
 
 | 推荐 | 不推荐 |
 | --- | --- |
@@ -225,7 +225,7 @@ await keepLast.add(doAction(...));
 | 每个业务域一个实例（Model / 组件 / Service） | 把互不相关的流程塞进同一个 `KeepLast` |
 | `await` **本次** `add` 的返回值 | 长期持有旧 `add` 的 Promise 并期望它最终 settle |
 
-### 最小心智模型
+#### 最小心智模型
 
 ```text
 keepLast.add(p) ≈
@@ -236,7 +236,7 @@ keepLast.add(p) ≈
 
 ---
 
-## 典型调用链
+### 典型调用链
 
 以搜索栏为例：
 
@@ -269,7 +269,7 @@ B 返回 → 继续执行，成为当前 Action
 
 ---
 
-## 扩展点与踩坑
+### 扩展点与踩坑
 
 1. **挂起的 await**：被顶掉的 `await keepLast.add(...)` 不会结束；其后代码（赋值、`notify`）不会执行——这通常正是期望行为，但若在外层还有 `finally` 清理逻辑，需确认是否依赖该 Promise settle。
 2. **错误被吞**：非最新任务的 reject 不会向外抛，调试时可能“看不到失败”。
@@ -278,7 +278,7 @@ B 返回 → 继续执行，成为当前 Action
 
 ---
 
-## 参考阅读（KeepLast）
+### 参考阅读（KeepLast）
 
 | 文件 | 关注点 |
 | --- | --- |
@@ -293,9 +293,9 @@ B 返回 → 继续执行，成为当前 Action
 
 ---
 
-# Mutex
+## Mutex
 
-## 总览
+### 总览
 
 `Mutex` 是同文件中的**串行化原语**：把多个可能返回 Promise 的计算排进队列，**前一个完成（成功或失败）后才执行下一个**。所有登记的任务都会执行，最终状态由最后一次执行决定——这与 `KeepLast`“丢弃旧结果、不保证旧任务副作用完成顺序”形成对比。
 
@@ -303,7 +303,7 @@ B 返回 → 继续执行，成为当前 Action
 
 ---
 
-## 类概览
+### 类概览
 
 | 项目 | 说明 |
 | --- | --- |
@@ -316,7 +316,7 @@ B 返回 → 继续执行，成为当前 Action
 
 ---
 
-## 源码解释
+### 源码解释
 
 ```71:112:addons/web/static/src/core/utils/concurrency.js
 export class Mutex {
@@ -352,7 +352,7 @@ export class Mutex {
 }
 ```
 
-### 状态字段
+#### 状态字段
 
 | 字段 | 含义 |
 | --- | --- |
@@ -361,21 +361,21 @@ export class Mutex {
 | `_unlockedProm` | “忙着”时对外暴露的解锁 Promise；空闲时为 `undefined` |
 | `_unlock` | 队列清空时 resolve `_unlockedProm` 的回调 |
 
-### 方法：`exec(action)`
+#### 方法：`exec(action)`
 
 1. `_queueSize++`；若尚无解锁 Promise，则创建 `_unlockedProm` / `_unlock`。
 2. 定义 `always`：在前序任务 settle 后执行 `action()`，无论成败都在 `finally` 里减计数；减到 `0` 时调用 `_unlock()`。
 3. `this._lock = this._lock.then(always, always)`：前一个成功或失败都接上下一个（**失败不堵死队列**）。
 4. 返回更新后的 `_lock`（即“等到本任务及其链上当前尾完成”的 Promise）。
 
-### 方法：`getUnlockedDef()`
+#### 方法：`getUnlockedDef()`
 
 - 队列忙：返回当前 `_unlockedProm`（全部任务结束后 resolve）。
 - 队列空：返回立刻 resolve 的 `Promise.resolve()`。
 
 用途：在启动新操作前等待“没有正在进行的 mutex 任务”（例如保存前等 onchange/写操作结束）。
 
-### 关键行为（测试）
+#### 关键行为（测试）
 
 | 场景 | 结果 |
 | --- | --- |
@@ -387,7 +387,7 @@ export class Mutex {
 
 ---
 
-## 功能说明
+### 功能说明
 
 一句话：**把异步临界区排成队，一个接一个跑完，避免并发写坏共享状态。**
 
@@ -401,9 +401,9 @@ export class Mutex {
 
 ---
 
-## 使用用途
+### 使用用途
 
-### 1. RelationalModel：保存 / 创建 / 分组
+#### 1. RelationalModel：保存 / 创建 / 分组
 
 `relational_model.js` 中 `this.mutex = new Mutex()`，典型用法：
 
@@ -413,11 +413,11 @@ export class Mutex {
 
 保证 onchange、save、创建记录等修改共享 datapoint 的操作不交错。
 
-### 2. Legacy BasicModel / Form / Kanban
+#### 2. Legacy BasicModel / Form / Kanban
 
 旧架构同样用 mutex 串行 `notifyChanges`、`reload`、`save`；Controller 侧用 `getUnlockedDef` 等待模型空闲后再 UI 操作。
 
-### 3. 与 KeepLast 组合
+#### 3. 与 KeepLast 组合
 
 ```js
 await this.keepLast.add(this.mutex.exec(() => newRecord.load()));
@@ -428,7 +428,7 @@ await this.keepLast.add(this.mutex.exec(() => newRecord.load()));
 
 ---
 
-## 使用方法
+### 使用方法
 
 ```js
 import { Mutex } from "@web/core/utils/concurrency";
@@ -445,7 +445,7 @@ await this.mutex.exec(async () => {
 await this.mutex.getUnlockedDef();
 ```
 
-### 推荐与不推荐
+#### 推荐与不推荐
 
 | 推荐 | 不推荐 |
 | --- | --- |
@@ -453,7 +453,7 @@ await this.mutex.getUnlockedDef();
 | 需要**每次**任务都执行完 | 期望取消旧任务（Mutex 不取消） |
 | 用 `getUnlockedDef` 做“空闲后再做” | 把无关操作塞进同一把锁导致假死感 |
 
-### 最小心智模型
+#### 最小心智模型
 
 ```text
 mutex.exec(fn) ≈
@@ -463,9 +463,9 @@ mutex.exec(fn) ≈
 
 ---
 
-# Race
+## Race
 
-## 总览
+### 总览
 
 `Race` 是受 `Promise.race` 启发的**动态竞速原语**：可随时 `add` 新 Promise；**本轮竞速中任意一个先 settle，整轮就结束**，所有等待本轮的调用方拿到同一结果；之后再 `add` 会开启新一轮竞速。
 
@@ -479,7 +479,7 @@ mutex.exec(fn) ≈
 
 ---
 
-## 类概览
+### 类概览
 
 | 项目 | 说明 |
 | --- | --- |
@@ -491,7 +491,7 @@ mutex.exec(fn) ≈
 
 ---
 
-## 源码解释
+### 源码解释
 
 ```122:164:addons/web/static/src/core/utils/concurrency.js
 export class Race {
@@ -526,7 +526,7 @@ export class Race {
 }
 ```
 
-### 方法：`add(promise)`
+#### 方法：`add(promise)`
 
 1. 若无进行中竞速：创建 `currentProm` 及 resolve/reject 包装（settle 时清空状态，便于下一轮）。
 2. 把传入的 `promise` 挂到当前 resolver/rejecter 上。
@@ -534,14 +534,14 @@ export class Race {
 
 任一参赛 Promise 先 resolve/reject → 本轮结束；之后再完成的 Promise 仍可能调用已清空的 resolver（此时多为 no-op / 对已 settle Promise 无效），竞速结果不再改变。
 
-### 方法：`getCurrentProm()`
+#### 方法：`getCurrentProm()`
 
 - 有进行中竞速：返回该 Promise。
 - 空闲：返回 `null`。
 
 常用于：改本地 meta（不重新拉数）前先 `await this.race.getCurrentProm()`，避免与进行中的加载打架。
 
-### 关键行为（测试）
+#### 关键行为（测试）
 
 | 场景 | 结果 |
 | --- | --- |
@@ -554,7 +554,7 @@ export class Race {
 
 ---
 
-## 功能说明
+### 功能说明
 
 一句话：**动态版 Promise.race——谁先完成用谁，同轮等待者共享结果，结束后可开新局。**
 
@@ -568,9 +568,9 @@ export class Race {
 
 ---
 
-## 使用用途
+### 使用用途
 
-### Graph / Pivot Model
+#### Graph / Pivot Model
 
 `graph_model.js`、`pivot_model.js` 同时使用 `KeepLast` 与 `Race`：
 
@@ -589,7 +589,7 @@ Pivot 中多处 `if (this.race.getCurrentProm())` / `await this.race.getCurrentP
 
 ---
 
-## 使用方法
+### 使用方法
 
 ```js
 import { Race } from "@web/core/utils/concurrency";
@@ -611,7 +611,7 @@ async tweakDisplay(params) {
 
 注意：`await null` 在 JS 中会立刻得到 `null`，故 `getCurrentProm()` 为空时不必特判也能安全 await（Pivot 也有显式 `Promise.resolve(this.race.getCurrentProm())` 的写法）。
 
-### 推荐与不推荐
+#### 推荐与不推荐
 
 | 推荐 | 不推荐 |
 | --- | --- |
@@ -619,7 +619,7 @@ async tweakDisplay(params) {
 | 用 `getCurrentProm` 等待在飞加载 | 假设后完成的请求还能改本轮结果 |
 | 与 KeepLast 分工：竞速 vs 世代 | 与 KeepLast 混用却不明确谁决定 UI |
 
-### 最小心智模型
+#### 最小心智模型
 
 ```text
 race.add(p) ≈
@@ -630,7 +630,7 @@ race.add(p) ≈
 
 ---
 
-## 三者对照（小结）
+### 三者对照（小结）
 
 | | KeepLast | Mutex | Race |
 | --- | --- | --- | --- |
@@ -641,7 +641,7 @@ race.add(p) ≈
 
 ---
 
-## 参考阅读（Mutex / Race）
+### 参考阅读（Mutex / Race）
 
 | 文件 | 关注点 |
 | --- | --- |
