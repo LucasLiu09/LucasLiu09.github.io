@@ -108,8 +108,8 @@ const sidebars = {
                 label: 'Utils',
                 items: [
                     'odoo/dev_notes/source_code_analysis/utils/web_concurrency',
-                    'odoo/dev_notes/utils_search_fuzzyLookup',
-                    'odoo/dev_notes/owl_useSortable',
+                    'odoo/dev_notes/source_code_analysis/utils/utils_search_fuzzyLookup',
+                    'odoo/dev_notes/source_code_analysis/utils/owl_useSortable',
                 ]
               },
             'odoo/dev_notes/check_credentials',
