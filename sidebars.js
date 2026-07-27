@@ -102,13 +102,20 @@ const sidebars = {
                     'odoo/dev_notes/source_code_analysis/components/action_menus_analyze',
                     'odoo/dev_notes/source_code_analysis/components/onWillUpdateProps',
                 ]
+             },
+             {
+                type: 'category',
+                label: 'Utils',
+                items: [
+                    'odoo/dev_notes/source_code_analysis/utils/web_concurrency',
+                    'odoo/dev_notes/utils_search_fuzzyLookup',
+                    'odoo/dev_notes/owl_useSortable',
+                ]
               },
             'odoo/dev_notes/check_credentials',
             'odoo/dev_notes/xml_rpc',
             'odoo/dev_notes/owl_dialog',
-            'odoo/dev_notes/utils_search_fuzzyLookup',
             'odoo/dev_notes/owl_dropdown',
-            'odoo/dev_notes/owl_useSortable',            
             'odoo/dev_notes/command_palette',
             'odoo/dev_notes/file_viewer_v17', 
             'odoo/dev_notes/source_code_analysis/common/addons_web_file_list',
