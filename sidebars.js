@@ -101,6 +101,7 @@ const sidebars = {
                     'odoo/dev_notes/source_code_analysis/components/component',
                     'odoo/dev_notes/source_code_analysis/components/action_menus_analyze',
                     'odoo/dev_notes/source_code_analysis/components/onWillUpdateProps',
+                    'odoo/dev_notes/source_code_analysis/components/breadcrumb_analyze',
                 ]
              },
              {
@@ -205,6 +206,7 @@ const sidebars = {
             'odoo/dev_notes/custom_module/ir_actions_report_docx',
             'odoo/dev_notes/custom_module/custom_popover_widget',
             'odoo/dev_notes/custom_module/file_preview_by_kkfile',
+            'odoo/dev_notes/custom_module/web_breadcrumb_back',
           ]
         },
         {
