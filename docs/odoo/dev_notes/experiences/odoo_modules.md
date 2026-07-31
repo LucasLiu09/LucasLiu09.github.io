@@ -7,7 +7,7 @@ keyword:
   - odoo development
 tags:
   - odoo
-
+toc_max_heading_level: 4
 ---
 
 # Odoo 模块收录
@@ -54,9 +54,22 @@ tags:
   - [Github](https://github.com/OCA/web/tree/19.0/web_refresher)
   - [OCA](https://apps.odoo-community.org/modules/web_refresher?serie=19.0)
 
-#### 
+#### web_pivot_computed_measure
 
 - 描述：在pivot视图上增加对computed measures的支持。
 - 来源：
   - [Github](https://github.com/OCA/web/tree/18.0/web_pivot_computed_measure)
   - [OCA](https://apps.odoo-community.org/modules/web_pivot_computed_measure)
+ 
+#### Web Responsive
+
+- 来源：
+  - [Github](https://github.com/OCA/web/tree/19.0/web_responsive)
+  - [OCA](https://apps.odoo-community.org/modules/web_responsive)
+
+#### Web Remember Tree Column Width
+
+- 描述：记住tree视图列的宽度。
+- 来源：
+  - [Github](https://github.com/OCA/web/tree/19.0/web_remember_tree_column_width)
+  - [OCA](https://apps.odoo-community.org/modules/web_remember_tree_column_width)
