@@ -14,6 +14,46 @@ toc_max_heading_level: 4
 
 ## OCA
 
+### queue
+
+#### Job Queue
+
+- 描述：为 Odoo 添加了一个集成的作业队列。它允许延迟执行异步方法调用。作业由 Jobrunner 在后台独立运行，并在各自的事务中执行。
+- 来源：[Github](https://github.com/OCA/queue/tree/19.0/queue_job)、 [OCA](https://apps.odoo-community.org/modules/queue_job)
+
+### server-auth
+
+#### Password Security
+
+- 描述：允许管理员设置公司级别的密码安全要求，并对用户强制执行这些要求。
+- 来源：[Github](https://github.com/OCA/server-auth/tree/18.0/password_security)、 [OCA](https://apps.odoo-community.org/modules/password_security)
+
+### server-brand
+
+#### Remove odoo.com Bindings
+
+- 描述：停用所有标准代码自带的与 odoo.com 的绑定。更新通知代码已被停用，并且该函数已被覆盖。此操作仅在社区版中停用，因为在 Odoo 企业版中停用通知代码是不允许的。设置中的“应用”和“更新”菜单项已隐藏在“技术参数”中。用户菜单中的“文档”、“支持”和“odoo.com 帐户”选项已被移除。
+- 来源：[Github](https://github.com/OCA/server-brand/tree/19.0/disable_odoo_online)、 [OCA](https://apps.odoo-community.org/modules/disable_odoo_online)
+
+### server-tools
+
+#### Improved Name Search
+
+- 描述：扩展了name search功能，使其使用更多、更宽松的匹配方法，并允许搜索可配置的其他记录字段。
+- 来源：[Github](https://github.com/OCA/server-tools/tree/18.0/base_name_search_improved)、 [OCA](https://apps.odoo-community.org/modules/base_name_search_improved)
+
+### server-ux
+
+#### Date Range
+
+- 描述：此模块允许您定义全局日期范围，该范围可用于在树状视图中筛选值。
+- 来源：[Github](https://github.com/OCA/server-ux/tree/19.0/date_range)、 [OCA](https://apps.odoo-community.org/modules/date_range)
+
+#### Mass Editing
+
+- 描述：允许在任何 Odoo 模型中同时编辑多个记录。
+- 来源：[Github](https://github.com/OCA/server-ux/tree/19.0/server_action_mass_edit)、 [OCA](https://apps.odoo-community.org/modules/server_action_mass_edit)
+
 ### web
 
 #### 2D matrix for x2many fields
@@ -97,16 +137,16 @@ toc_max_heading_level: 4
 
 - 描述：安装或升级模块时使用 web_notify 向每个活跃用户发送通知。通知将要求用户刷新页面以获取最新信息变化。
 - 来源：[Github](https://github.com/OCA/web/tree/18.0/web_notify_upgrade)、 [OCA](https://apps.odoo-community.org/modules/web_notify_upgrade)
- 
-#### Web Refresher
-
-- 描述：在Pager旁边添加一个按钮(在`tree/kanban`视图中)以刷新显示列表。
-- 来源：[Github](https://github.com/OCA/web/tree/19.0/web_refresher)、 [OCA](https://apps.odoo-community.org/modules/web_refresher?serie=19.0)
 
 #### web_pivot_computed_measure
 
 - 描述：在pivot视图上增加对computed measures的支持。
 - 来源：[Github](https://github.com/OCA/web/tree/18.0/web_pivot_computed_measure)、 [OCA](https://apps.odoo-community.org/modules/web_pivot_computed_measure)
+
+#### Web Refresher
+
+- 描述：在Pager旁边添加一个按钮(在`tree/kanban`视图中)以刷新显示列表。
+- 来源：[Github](https://github.com/OCA/web/tree/19.0/web_refresher)、 [OCA](https://apps.odoo-community.org/modules/web_refresher?serie=19.0)
  
 #### Web Responsive
 
@@ -152,3 +192,9 @@ toc_max_heading_level: 4
 
 - 来源：[Github](https://github.com/OCA/web/tree/19.0/web_m2x_options)、 [OCA](https://apps.odoo-community.org/modules/web_m2x_options)
 
+### other
+
+#### Base report xlsx
+
+- 描述：This module provides a basic report class to generate xlsx report.
+- 来源：[Github](https://github.com/OCA/reporting-engine/tree/19.0/report_xlsx)、 [OCA](https://apps.odoo-community.org/modules/report_xlsx)
