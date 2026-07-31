@@ -16,6 +16,41 @@ toc_max_heading_level: 4
 
 ### web
 
+#### Colorize field in tree views
+
+- 描述：支持对list视图中根据记录中的数据动态设置字段的字体/背景颜色。
+- 来源：[Github](https://github.com/OCA/web/tree/18.0/web_tree_dynamic_colored_field)、 [OCA](https://apps.odoo-community.org/modules/web_tree_dynamic_colored_field)
+
+#### Custom shortcut icon
+
+- 描述：自定义 Odoo 实例的快捷方式图标(又名 favicon)
+- 来源：[Github](https://github.com/OCA/web/tree/19.0/web_favicon)、 [OCA](https://apps.odoo-community.org/modules/web_favicon)
+
+#### Dynamic Dropdown Widget
+
+- 描述：Dynamic dropdown widget that supports resolving options from backend of：char/integer/float
+- 来源：[Github](https://github.com/OCA/web/tree/18.0/web_widget_dropdown_dynamic)、 [OCA](https://apps.odoo-community.org/modules/web_widget_dropdown_dynamic)
+
+#### Group Expand Buttons
+
+- 描述：在list视图增加展开/折叠分组的按钮
+- 来源：[Github](https://github.com/OCA/web/tree/19.0/web_group_expand)、 [OCA](https://apps.odoo-community.org/modules/web_group_expand)
+
+#### Input patterns
+
+- 描述：在后端给文本字段设置正则约束
+- 来源：[Github](https://github.com/OCA/web/tree/18.0/web_widget_pattern)、 [OCA](https://apps.odoo-community.org/modules/web_widget_pattern)
+
+#### List Range Selection
+
+- 描述：允许用shift键来批量选择list view的记录。
+- 来源：[Github](https://github.com/OCA/web/tree/16.0/web_listview_range_select)、 [OCA](https://apps.odoo-community.org/modules/web_listview_range_select)
+
+#### Progressive web application(PWA)
+
+- 描述：Make Odoo an installable Progressive Web Application.
+- 来源：[Github](https://github.com/OCA/web/tree/16.0/web_pwa_oca)、 [OCA](https://apps.odoo-community.org/modules/web_pwa_oca)
+
 #### Web Environment Ribbon
 
 - 描述：在每一页左上角用红色丝带标记一个测试环境。
