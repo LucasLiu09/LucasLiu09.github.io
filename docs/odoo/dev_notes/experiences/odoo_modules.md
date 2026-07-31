@@ -8,6 +8,8 @@ keyword:
 tags:
   - odoo
 
+---
+
 # Odoo 模块收录
 
 ## OCA
