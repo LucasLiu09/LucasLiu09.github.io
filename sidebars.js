@@ -227,6 +227,7 @@ const sidebars = {
             'odoo/dev_notes/experiences/one2many_sequential_numbering',
           ]
          },
+        'odoo/dev_notes/experiences/odoo_modules',
         'odoo/dev_notes/translate',
         'odoo/dev_notes/code_quick_reference_table',
         'odoo/dev_notes/common/performance_optimization',
