@@ -16,6 +16,25 @@ toc_max_heading_level: 4
 
 ### web
 
+#### 2D matrix for x2many fields
+
+- 描述：This module allows to show an x2many field with 3-tuples ($x_value, $y_value, $value) in a table
+- 来源：[Github](https://github.com/OCA/web/tree/18.0/web_widget_x2many_2d_matrix)、 [OCA](https://apps.odoo-community.org/modules/web_widget_x2many_2d_matrix)
+
+#### Advanced search
+
+- 来源：[Github](https://github.com/OCA/web/tree/16.0/web_advanced_search)、 [OCA](https://apps.odoo-community.org/modules/web_advanced_search)
+
+#### Apply Field Style
+
+- 描述：Allow to set an additional css class to fields in form view.
+- 来源：[Github](https://github.com/OCA/web/tree/16.0/web_apply_field_style)、 [OCA](https://apps.odoo-community.org/modules/web_apply_field_style)
+
+#### Clickable many2one fields for tree views
+
+- 描述：允许用户从list视图上直接使用按钮打开关联字段的资源而不访问表单。
+- 来源：[Github](https://github.com/OCA/web/tree/19.0/web_tree_many2one_clickable)、 [OCA](https://apps.odoo-community.org/modules/web_tree_many2one_clickable)
+
 #### Colorize field in tree views
 
 - 描述：支持对list视图中根据记录中的数据动态设置字段的字体/背景颜色。
