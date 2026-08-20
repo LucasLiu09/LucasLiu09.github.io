@@ -102,6 +102,7 @@ const sidebars = {
                     'odoo/dev_notes/source_code_analysis/components/action_menus_analyze',
                     'odoo/dev_notes/source_code_analysis/components/onWillUpdateProps',
                     'odoo/dev_notes/source_code_analysis/components/breadcrumb_analyze',
+                    'odoo/dev_notes/source_code_analysis/components/search_panel_analysis',
                 ]
              },
              {
