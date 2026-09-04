@@ -103,6 +103,8 @@ const sidebars = {
                     'odoo/dev_notes/source_code_analysis/components/onWillUpdateProps',
                     'odoo/dev_notes/source_code_analysis/components/breadcrumb_analyze',
                     'odoo/dev_notes/source_code_analysis/components/search_panel_analysis',
+                    'odoo/dev_notes/owl_dropdown',
+                    'odoo/dev_notes/owl_dialog',
                 ]
              },
              {
@@ -114,10 +116,16 @@ const sidebars = {
                     'odoo/dev_notes/source_code_analysis/utils/owl_useSortable',
                 ]
               },
+            {
+                type: 'category',
+                label: 'Common',
+                items: [
+                    'odoo/dev_notes/source_code_analysis/common/Odoo16_register_hook_and_patch_method-analysis',
+                    'odoo/dev_notes/source_code_analysis/common/Odoo16_register_hook_and_patch_method-extension',
+                ]
+              },
             'odoo/dev_notes/check_credentials',
             'odoo/dev_notes/xml_rpc',
-            'odoo/dev_notes/owl_dialog',
-            'odoo/dev_notes/owl_dropdown',
             'odoo/dev_notes/command_palette',
             'odoo/dev_notes/file_viewer_v17', 
             'odoo/dev_notes/source_code_analysis/common/addons_web_file_list',
