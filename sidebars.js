@@ -120,6 +120,7 @@ const sidebars = {
                 type: 'category',
                 label: 'Common',
                 items: [
+                    'odoo/dev_notes/source_code_analysis/common/Odoo16_owl_registry_analysis_1',
                     'odoo/dev_notes/source_code_analysis/common/Odoo16_register_hook_and_patch_method-analysis',
                     'odoo/dev_notes/source_code_analysis/common/Odoo16_register_hook_and_patch_method-extension',
                 ]
