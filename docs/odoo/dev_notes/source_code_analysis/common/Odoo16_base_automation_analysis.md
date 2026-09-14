@@ -2,9 +2,10 @@
 title: Odoo 16 base_automation 源码解析
 sidebar_label: base_automation
 description: 从资深开发视角梳理 Automated Action 的触发层、hook 补丁、预/后置 Domain 与定时窗口。
-tags:
+keyword:
     - odoo
     - odoo development
+tags: [odoo]
 ---
 
 # Odoo 16 base_automation 源码解析
