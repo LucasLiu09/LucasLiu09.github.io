@@ -295,7 +295,7 @@ e.context['base_automation'] = {'id': self.id, 'name': self.name}
 `filter_domain` 用 `filtered_domain`，仍可能在重算过程中 flush。官方 `test_recursion`：父任务删除导致子任务 `project_id` 重算时，曾把递归深度打到爆。复杂递归计算模型上慎挂 Domain。
 
 **9. 不要在 `_inherit` 里“再实现一遍自动化”。**  
-扩展动作类型应给 `ir.actions.server` 加 `_run_action_<state>`；扩展触发应考虑 hook 的可逆性（`delattr` / `_onchange_methods` 重建）。和项目 `crud_hook` 怎么分工、二次开发挂哪一层，见 [对比文档](./Odoo16-base_automation-与-crud_hook-对比.md)。
+扩展动作类型应给 `ir.actions.server` 加 `_run_action_<state>`；扩展触发应考虑 hook 的可逆性（`delattr` / `_onchange_methods` 重建）。和项目 `crud_hook` 怎么分工、二次开发挂哪一层，见 [对比文档](./Odoo16_base_automation_crud_hook_diff.md)。
 
 ---
 
