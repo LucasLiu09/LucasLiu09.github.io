@@ -2,9 +2,10 @@
 title: Odoo 16 base_automation 与 crud_hook 对比
 sidebar_label: 挂钩层选择
 description: 对比官方自动化与项目 CRUD Hook，并给出二次开发该挂哪一层的判断。
-tags:
+keyword:
     - odoo
     - odoo development
+tags: [odoo]
 ---
 
 # base_automation 与 crud_hook：该挂哪一层
