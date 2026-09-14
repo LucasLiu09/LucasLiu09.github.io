@@ -10,7 +10,7 @@ tags:
 # base_automation 与 crud_hook：该挂哪一层
 
 :::info[说明]
-对照 `addons/base_automation` 与 `hh_addons/crud_hook`。机制细节见 [base_automation 源码解析](./Odoo16-base_automation_analysis.md) 与 `hh_addons/crud_hook/README.md`。本文只回答：两者差在哪、二次开发挂哪一层。
+对照 `addons/base_automation` 与 `/crud_hook`。机制细节见 [base_automation 源码解析](./Odoo16_base_automation_analysis.md) 与 `/crud_hook/README.md`。本文只回答：两者差在哪、二次开发挂哪一层。
 :::
 
 ## 总览
@@ -277,7 +277,7 @@ class MyHandler(CrudHookHandler):
 
 | 文件                                                                                                       | 看什么                            |
 | -------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| [Odoo16-base_automation-源码解析.md](./Odoo16-base_automation_analysis.md)                                       | 自动化触发、pre/post、`__action_done` |
+| [Odoo16-base_automation-源码解析.md](./Odoo16_base_automation_analysis.md)                                       | 自动化触发、pre/post、`__action_done` |
 | `/crud_hook/models/crud_hook_rule.py`                                                           | 订阅、patch、静默嵌套、`_dispatch`      |
 | `/crud_hook/handlers/`                                                                          | handler 契约与四种实现                |
 | `/crud_hook/README.md`                                                                          | 配置与权限                          |
