@@ -25,6 +25,10 @@ tags: [projectManager]
 - **级别**: Practitioner
 - **获得时间**: 2024年05月10日
 
+### CSPM-3 (China Standards Project Management)
+- **颁发机构**: 中国标准化协会
+- **获得时间**: 2026年09月14日
+
 ## 技能矩阵
 | 技能领域 | PMP | CSPM-2 | PRINCE2 | 说明 |
 |---------|-----|--------|---------|------|
@@ -62,6 +66,11 @@ tags: [projectManager]
 
 <img
   src={require('./assets/_images/PRINCE2.jpg').default}
+  alt="PRINCE2-Practitioner" width="800" height="600"
+/>
+
+<img
+  src={require('./assets/_images/CSPM-3.png').default}
   alt="PRINCE2-Practitioner" width="800" height="600"
 />
 
