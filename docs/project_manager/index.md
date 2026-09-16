@@ -77,11 +77,11 @@ tags: [projectManager]
 ## 证书的对应认可关系
 
 <img
-  src={require('./assets/_images/证书对应认可关系图.jpg').default}
+  src={require('./assets/_images/证书对应认可关系图-20260705.png').default}
   alt="证书对应认可关系图" width="800" height="600"
 />
 
-> 图片来源：[项目管理人员评价信息系统](https://cspm.china-cas.org/gyks/331.jhtml)
+> 图片来源：[项目管理人员评价信息系统](https://cspm.china-cas.org/gyks/331.jhtml)，发布时间：2026-07-05 
 
 :::tip 专业建议
 这些认证涵盖了从传统项目管理到敏捷开发的完整技能体系
