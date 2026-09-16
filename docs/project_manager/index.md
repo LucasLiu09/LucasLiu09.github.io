@@ -71,7 +71,7 @@ tags: [projectManager]
 
 <img
   src={require('./assets/_images/CSPM-3.png').default}
-  alt="PRINCE2-Practitioner" width="800" height="600"
+  alt="PRINCE2-Practitioner" width="600" height="800"
 />
 
 ## 证书的对应认可关系
