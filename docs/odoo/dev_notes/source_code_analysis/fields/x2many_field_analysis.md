@@ -7,7 +7,7 @@ keyword:
     - odoo development
 tags: [odoo]
 last_update:
-  date: 2026/1/20
+  date: 2026/9/22
   author: Lucas
 ---
 
@@ -124,5 +124,69 @@ last_update:
 - 当 `X2ManyField` 增加一条记录到 `list` 时，由于 Owl 的响应式机制，`ListRenderer` 会感知到 `props.list.records` 的变化并自动重新渲染 DOM。
 - 这种机制避免了显式的事件总线（Event Bus）传递，使得上下层在数据一致性上保持同步。
 
+## 8. 扩展需求
+
+在明细列表**上方**增加按钮，点击后自动写入多行预设明细。新行只进入父表单的本地草稿，等用户手动保存后才落库；用户丢弃表单时，虚拟行一并丢掉。
+
+本节对应第 6 节“自定义按钮”建议，说明应继承 `X2ManyField`、走哪条写入路径、以及为什么这条路径不会立刻入库。
+
+### 8.1 需求边界
+
+| 项 | 约定 |
+| :--- | :--- |
+| 按钮位置 | 列表上方的 `o_x2m_control_panel`，不是列表底部的 `Add a line` |
+| 字段类型 | 明细行用 **one2many** |
+| 落库时机 | 父表单保存时，随父记录一起写成 `(0, 0, vals)` |
+| 显示条件 | `!props.readonly` 且 `activeActions.create`，与原生新增同一套权限 |
+| 注册方式 | 新 widget（如 `preset_one2many`），不要覆盖全局 `one2many` |
+
+原生 `Add a line` 由 `ListRenderer` 画在表格最后一行（`o_field_x2many_list_row_add`），够不着控制面板。看板视图的“添加”按钮才画在 `o_x2m_control_panel` 里（见 `displayAddButton`）。列表模式下要在表格上方放按钮，只能扩展 `web.X2ManyField` 模板。
+
+### 8.2 为何不会立刻入库
+
+Odoo 16 的 one2many 列表是 `StaticList`。按钮应复用它自己的 `list.addNew()`，不要对子模型发 `create`。
+
+写入链路：
+
+1. `list.addNew({ context, position })` 发出 `CREATE` 命令。
+2. 底层 `_addX2ManyDefaultRecord()` 只调子模型的 `default_get`，得到一个**虚拟 id**。
+3. 列表把 `{operation: 'ADD', isNew: true}` 推进父记录的 `_changes`。
+4. `addNew()` 里那次 `save({ savePoint: true })` 只把当前编辑内容记成可回滚的本地存档。`BasicModel.save` 在 `savePoint` 为真时直接返回，**不发** `create` / `write`。
+
+用户点父表单保存时，这些新行才被收成 `(0, 0, vals)`，跟父记录同一次写入。
+
+### 8.3 推荐实现路径
+
+单独做一个小模块，三块东西：
+
+1. **JS**：`class PresetX2ManyField extends X2ManyField`，注册成新 widget（如 `preset_one2many`）。只有声明了这个 widget 的字段才出现按钮。
+2. **XML**：`t-inherit="web.X2ManyField"`，`t-inherit-mode="primary"`。按钮放进已有的 `o_x2m_control_panel`。
+3. **视图**：字段上声明 widget，子 tree 使用行内编辑，例如 `editable="bottom"`。
+
+预设值从 `this.props.record.data` 读父记录当前值。many2one 传整数 id。`context` 里的 `default_product_id`、`default_qty` 会进 `default_get`。
+
+### 8.4 按钮点击后的处理顺序
+
+按这个顺序，不要改成直接 RPC：
+
+1. 若 `this.list.editedRecord` 还在编辑，先 `switchMode("readonly", { checkValidity: true })`。`X2ManyField.onAdd` 就是这样做的。当前行校验不过就停，否则新行可能被丢弃。
+2. 对每一条预设调用 `this.list.addNew({ context, position: "bottom" })`。不要传 `mode: "edit"`，否则新行会进入行内编辑。
+3. `default_*` 覆盖不到的字段，再用返回的那条 `record.update(vals)` 补上。`update` 只会再触发 onchange，仍然不写库。
+4. 若子模型 onchange 会改写 `default_*`，以第 3 步的 `update` 为准，它发生在默认值和 onchange 之后。
+
+多行按顺序逐条 `addNew`。列表已经满一页时，`position: "bottom"` 会把 `limit` 临时加一，新行留在当前页。`list` 是 Reactive 对象，插入后 `ListRenderer` 会自动重绘，不必再手动 `render()`。
+
+### 8.5 不要走的路径
+
+| 做法 | 结果 |
+| :--- | :--- |
+| 子记录上的 `orm.create`、`record.save()` | 立刻插入数据库 |
+| 表单上的 `type="object"` 按钮 | Odoo 会先保存父记录再调方法 |
+| many2many 的“新建并关联” | 脏记录会先被 `save()` |
+| 覆盖全局 `one2many` widget | 所有 one2many 列表都会出现该按钮 |
+
+子模型 onchange 里如果自己 `create`，那是服务端副作用，前端拦不住。预设行要满足 tree 上的必填字段，否则父表单保存会被校验拦住。
+
 ---
-*日期：2026-01-19*
+*日期：2026-09-22*
+
