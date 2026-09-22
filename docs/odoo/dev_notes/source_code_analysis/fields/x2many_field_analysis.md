@@ -170,7 +170,7 @@ Odoo 16 的 one2many 列表是 `StaticList`。按钮应复用它自己的 `list.
 按这个顺序，不要改成直接 RPC：
 
 1. 若 `this.list.editedRecord` 还在编辑，先 `switchMode("readonly", { checkValidity: true })`。`X2ManyField.onAdd` 就是这样做的。当前行校验不过就停，否则新行可能被丢弃。
-2. 对每一条预设调用 `this.list.addNew({ context, position: "bottom" })`。不要传 `mode: "edit"`，否则新行会进入行内编辑。
+2. 对每一条预设调用 `this.list.addNew({ context, position: "bottom" })`。参数必须是对象，不要包数组。不要传 `mode: "edit"`，否则新行会进入行内编辑。参数、`default_*` 与常见踩坑见第 9 节。
 3. `default_*` 覆盖不到的字段，再用返回的那条 `record.update(vals)` 补上。`update` 只会再触发 onchange，仍然不写库。
 4. 若子模型 onchange 会改写 `default_*`，以第 3 步的 `update` 为准，它发生在默认值和 onchange 之后。
 
@@ -186,6 +186,144 @@ Odoo 16 的 one2many 列表是 `StaticList`。按钮应复用它自己的 `list.
 | 覆盖全局 `one2many` widget | 所有 one2many 列表都会出现该按钮 |
 
 子模型 onchange 里如果自己 `create`，那是服务端副作用，前端拦不住。预设行要满足 tree 上的必填字段，否则父表单保存会被校验拦住。
+
+## 9. `this.list.addNew` 实操
+
+按钮点击后真正写入草稿行的入口是 `StaticList.addNew`（Odoo 16 在 `basic_relational_model.js`）。它只收 **一个对象**，不是数组。
+
+### 9.1 签名与参数
+
+```javascript
+async addNew(params) {
+    const position = params.position;
+    const operation = { context: [params.context], operation: "CREATE", position };
+    await this.model.__bm__.save(this.__bm_handle__, { savePoint: true });
+    this.model.__bm__.freezeOrder(this.__bm_handle__);
+    await this.__syncParent(operation);
+    const newRecord = this.records[position === "bottom" ? this.records.length - 1 : 0];
+    if (params.mode === "edit") {
+        await newRecord.switchMode("edit");
+    }
+    return newRecord;
+}
+```
+
+| 参数 | 类型 | 作用 |
+| :--- | :--- | :--- |
+| `context` | `Object` | 追加到 `default_get` 的 context。`default_xxx` 会填到对应字段。 |
+| `position` | `"top"` / `"bottom"` | 新行插入位置。不是 `"bottom"` 时取 `records[0]`。 |
+| `mode` | `"edit"` / 其他 | 只有 `"edit"` 会切到行内编辑。预设多行时应传 `"readonly"`，或干脆不传。 |
+
+返回值是刚插入的那条 `Record`。`default_*` 覆盖不到的字段，再对它 `await record.update(vals)`。
+
+框架里的标准调用也是对象，不是数组：
+
+```javascript
+// useAddInlineRecord
+await addNew({ context, mode: "edit", position: editable });
+
+// X2ManyField.onAdd：先合并字段 context，再走 addInLine
+context = makeContext([record.getFieldContext(this.props.name), context]);
+return this.addInLine({ context, editable });
+```
+
+`setup()` 里这句容易看错：
+
+```javascript
+this.addInLine = useAddInlineRecord({
+    addNew: (...args) => this.list.addNew(...args),
+});
+```
+
+`...args` 打印出来是数组，但展开后 `addNew` 收到的仍是那个对象。自定义代码应直接传对象，不要按打印结果再包一层 `[]`。
+
+### 9.2 正确调用
+
+```javascript
+const record = this.props.record;
+const context = makeContext([
+    record.getFieldContext(this.props.name),
+    { default_distance: 49.99, default_company_id: companyId },
+]);
+
+if (this.list.editedRecord) {
+    await this.list.editedRecord.switchMode("readonly", { checkValidity: true });
+    if (this.list.editedRecord) {
+        return; // 当前行校验失败，停
+    }
+}
+
+const newRecord = await this.list.addNew({
+    context,
+    mode: "readonly",
+    position: "top",
+});
+await newRecord.update({ co2_rmk: "preset" });
+```
+
+要点：
+
+1. **传对象** `{ context, mode, position }`。
+2. 用 `makeContext([字段 context, 额外 default_])` 合并。第二个参数是求值环境，**不会**并进返回的 context。
+3. 多行必须逐条 `await`。`addNew` 会改 list 的 commands，并发 CREATE 会互相覆盖。
+4. 当前行还在编辑时，先切回只读并校验，与 `X2ManyField.onAdd` 一致。
+
+### 9.3 `default_` 如何落到字段
+
+`addNew` 把 `params.context` 包成 `{ context: [params.context], operation: "CREATE" }`。底层 `_addX2ManyDefaultRecord` 把每一项当作 `additionalContext`，再调子模型 `default_get`。
+
+`sanitize_default_values` 只会剥掉 **列表自身** context 里已有的 `default_*`，避免旧默认值污染新行。你这次传入的 `additionalContext` 不会被剥，`default_distance` 会进 `default_get`。
+
+| 写法 | 结果 |
+| :--- | :--- |
+| `makeContext([fieldCtx, { default_distance: 49.99 }])` | `distance` 有默认值 |
+| `makeContext([fieldCtx], { default_distance: 49.99 })` | 第二参只作求值环境，`distance` **没有**默认值 |
+| `this.list.addNew([{ context, mode, position }])` | `params.context` 为 `undefined`，`default_*` 全部丢失 |
+
+### 9.4 错误示范：把 rest 参数当成 API
+
+```javascript
+// 错：包了一层数组
+this.list.addNew([{
+    context: { default_distance: 49.99 },
+    mode: "readonly",
+    position: "top",
+}]);
+```
+
+此时 `params` 是数组：
+
+| 取值 | 实际结果 |
+| :--- | :--- |
+| `params.context` | `undefined` |
+| `params.position` | `undefined` |
+| `params.mode` | `undefined` |
+
+CREATE 仍会执行，所以列表里能看到新行，但 `default_get` 拿不到 `default_distance`，字段全是空。行能建、默认值没有，就是这个原因。
+
+### 9.5 完整示例：自定义按钮连插多行
+
+继承 `X2ManyField` 后，在点击方法里写：
+
+```javascript
+async addMultiLines() {
+    const record = this.props.record;
+    const context = makeContext([
+        record.getFieldContext(this.props.name),
+        { default_distance: 49.99 },
+    ]);
+    for (let i = 0; i < 6; i++) {
+        await this.list.addNew({
+            context,
+            mode: "readonly",
+            position: "top",
+        });
+    }
+}
+```
+
+新行只进父表单草稿。用户保存父记录时才写成 `(0, 0, vals)`；丢弃表单则虚拟行一起丢掉。不要对子模型 `orm.create`，也不要在这之后 `newRecord.save()`。
+
 
 ---
 *日期：2026-09-22*
