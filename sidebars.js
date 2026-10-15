@@ -237,6 +237,7 @@ const sidebars = {
             'odoo/dev_notes/experiences/picture_quality_issues',
             'odoo/dev_notes/experiences/reset_password_issues',
             'odoo/dev_notes/experiences/one2many_sequential_numbering',
+            'odoo/dev_notes/experiences/qweb_build_email_v16',
           ]
          },
         'odoo/dev_notes/experiences/odoo_modules',
