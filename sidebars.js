@@ -125,7 +125,7 @@ const sidebars = {
                     'odoo/dev_notes/source_code_analysis/common/Odoo16_register_hook_and_patch_method-analysis',
                     'odoo/dev_notes/source_code_analysis/common/Odoo16_register_hook_and_patch_method-extension',
                     'odoo/dev_notes/source_code_analysis/common/Odoo16_orm_flush',
-                    'odoo/dev_notes/source_code_analysis/common/Odoo16_orm_call_and_silent',
+                    'odoo/dev_notes/source_code_analysis/common/Odoo16_orm_call_and_silent', 
                 ]
               },
             'odoo/dev_notes/check_credentials',
