@@ -241,6 +241,13 @@ const sidebars = {
             'odoo/dev_notes/experiences/qweb_build_email_v16',
           ]
          },
+        {
+          type: 'category',
+          label: '版本升级',
+          items: [
+            'odoo/dev_notes/migration/odoo18_to_odoo20_dev_migration',
+          ]
+         },
         'odoo/dev_notes/experiences/odoo_modules',
         'odoo/dev_notes/translate',
         'odoo/dev_notes/code_quick_reference_table',
